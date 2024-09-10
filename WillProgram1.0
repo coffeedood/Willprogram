@@ -1,0 +1,384 @@
+import tkinter as tk
+from tkinter import messagebox, filedialog
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import json
+import os
+
+
+#HAS TO DO DOUBLE CLICK...  THEN DOUBLE CLICK to select a profile
+PROFILES_FILE = "profiles.json"
+profiles = []
+
+# Load images as text placeholders
+CHECKMARK = "✔"
+XMARK = "✘"
+
+# Function to save data to JSON
+def save_to_json(data, filename):
+    try:
+        with open(filename, 'w') as file:
+            json.dump(data, file, indent=4)
+    except IOError:
+        messagebox.showerror("Error", "Could not save data to file.")
+
+# Function to load data from JSON
+def load_from_json(filename):
+    if os.path.exists(filename):
+        try:
+            with open(filename, 'r') as file:
+                data = json.load(file)
+                if isinstance(data, list):
+                    return [p for p in data if isinstance(p, dict)]
+        except IOError:
+            messagebox.showerror("Error", "Could not load data from file.")
+    return []
+
+# Load profiles from JSON on startup
+profiles = load_from_json(PROFILES_FILE)
+
+# Function to update status labels
+def update_profiles_listbox():
+    profiles_listbox.delete(0, tk.END)
+    for profile in profiles:
+        profiles_listbox.insert(tk.END, profile['name'])
+
+# Function to update labels based on the profile
+def update_labels(profile):
+    def update_label(label, data, label_text):
+        if data:
+            label.config(text=f"{label_text} ✓")
+        else:
+            label.config(text=f"{label_text} x")
+    
+    update_label(banking_info_label, profile.get('banking_info', {}), "Banking Info")
+    update_label(credit_debts_label, profile.get('credit_debts', []), "Insurance Info")
+    update_label(vehicles_label, profile.get('vehicles', []), "Vehicles")
+    update_label(contacts_label, profile.get('contacts', []), "Contacts")
+    update_label(documents_label, profile.get('documents', []), "Pets and Livestock")
+    update_label(housing_label, profile.get('housing', {}), "Housing")
+    update_label(housing_label2, profile.get('housing2', {}), "Bio Info")
+
+
+
+# Function to update the labels for the currently selected profile
+def update_selected_profile_labels():
+    selected_profile_name = profiles_listbox.get(tk.ACTIVE)
+    if selected_profile_name:
+        profile = next((p for p in profiles if p['name'] == selected_profile_name), None)
+        if profile:
+            update_labels(profile)
+
+# Function to open the window for managing vehicles
+def open_vehicles_window(profile_name):
+    profile = next((p for p in profiles if p['name'] == profile_name), None)
+    if not profile:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' not found.")
+        return
+
+    vehicles_window = tk.Toplevel()
+    vehicles_window.title(f"Vehicles for Profile: {profile_name}")
+
+    vehicles_list = tk.Listbox(vehicles_window, width=50, height=10)
+    vehicles_list.pack(side=tk.LEFT, fill=tk.Y)
+
+    scrollbar = tk.Scrollbar(vehicles_window)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    vehicles_list.configure(yscrollcommand=scrollbar.set)
+    scrollbar.configure(command=vehicles_list.yview)
+
+    def print_vehicles():
+        vehicles_list.delete(0, tk.END)
+        for vehicle in profile.get('vehicles', []):
+            vehicle_info = f"Model: {vehicle.get('model', 'N/A')}, Year: {vehicle.get('year', 'N/A')}, Other Details: {vehicle.get('other_details', 'N/A')}"
+            vehicles_list.insert(tk.END, vehicle_info)
+
+    def add_vehicle():
+        add_vehicle_window = tk.Toplevel()
+        add_vehicle_window.title("Add Vehicle")
+
+        tk.Label(add_vehicle_window, text="Model:").pack(pady=10)
+        model_entry = tk.Entry(add_vehicle_window)
+        model_entry.pack()
+
+        tk.Label(add_vehicle_window, text="Year:").pack(pady=10)
+        year_entry = tk.Entry(add_vehicle_window)
+        year_entry.pack()
+
+        tk.Label(add_vehicle_window, text="Other Details:").pack(pady=10)
+        other_details_entry = tk.Entry(add_vehicle_window)
+        other_details_entry.pack()
+
+        def save_vehicle():
+            if 'vehicles' not in profile:
+                profile['vehicles'] = []
+            new_vehicle = {
+                'model': model_entry.get(),
+                'year': year_entry.get(),
+                'other_details': other_details_entry.get()
+            }
+            profile['vehicles'].append(new_vehicle)
+            save_to_json(profiles, PROFILES_FILE)
+            print_vehicles()
+            update_vehicles_label(profile)
+            update_selected_profile_labels()  # Update labels after saving
+            add_vehicle_window.destroy()
+
+        tk.Button(add_vehicle_window, text="Save Vehicle", command=save_vehicle).pack(pady=10)
+
+    tk.Button(vehicles_window, text="Add Vehicle", command=add_vehicle).pack(pady=10)
+    print_vehicles()
+
+def open_housing_window2(profile_name):
+    profile = next((p for p in profiles if p['name'] == profile_name), None)
+    if not profile:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' not found.")
+        return
+
+    housing_window = tk.Toplevel()
+    housing_window.title(f"Housing for Profile: {profile_name}")
+
+    tk.Label(housing_window, text="Address:").pack(pady=10)
+    address_entry = tk.Entry(housing_window)
+    address_entry.pack()
+    address_entry.insert(0, profile.get('housing2', {}).get('address', ''))
+
+    tk.Label(housing_window, text="Mortgages:").pack(pady=10)
+    mortgages_entry = tk.Entry(housing_window)
+    mortgages_entry.pack()
+    mortgages_entry.insert(0, profile.get('housing2', {}).get('mortgages', ''))
+
+    tk.Label(housing_window, text="Other Property Details:").pack(pady=10)
+    other_details_entry = tk.Entry(housing_window)
+    other_details_entry.pack()
+    other_details_entry.insert(0, profile.get('housing2', {}).get('other_details', ''))
+
+    def save_housing2():
+        profile['housing2'] = {
+            'address': address_entry.get(),
+            'mortgages': mortgages_entry.get(),
+            'other_details': other_details_entry.get()
+        }
+        save_to_json(profiles, PROFILES_FILE)
+        update_housing_label(profile)
+        update_selected_profile_labels()  # Update labels after saving
+        housing_window.destroy()
+
+    tk.Button(housing_window, text="Save Changes", command=save_housing2).pack(pady=10)
+
+# Function to open the window for managing housing
+def open_housing_window(profile_name):
+    profile = next((p for p in profiles if p['name'] == profile_name), None)
+    if not profile:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' not found.")
+        return
+
+    housing_window = tk.Toplevel()
+    housing_window.title(f"Housing for Profile: {profile_name}")
+
+    tk.Label(housing_window, text="Address:").pack(pady=10)
+    address_entry = tk.Entry(housing_window)
+    address_entry.pack()
+    address_entry.insert(0, profile.get('housing', {}).get('address', ''))
+
+    tk.Label(housing_window, text="Mortgages:").pack(pady=10)
+    mortgages_entry = tk.Entry(housing_window)
+    mortgages_entry.pack()
+    mortgages_entry.insert(0, profile.get('housing', {}).get('mortgages', ''))
+
+    tk.Label(housing_window, text="Other Property Details:").pack(pady=10)
+    other_details_entry = tk.Entry(housing_window)
+    other_details_entry.pack()
+    other_details_entry.insert(0, profile.get('housing', {}).get('other_details', ''))
+
+    def save_housing():
+        profile['housing'] = {
+            'address': address_entry.get(),
+            'mortgages': mortgages_entry.get(),
+            'other_details': other_details_entry.get()
+        }
+        save_to_json(profiles, PROFILES_FILE)
+        update_housing_label(profile)
+        update_selected_profile_labels()  # Update labels after saving
+        housing_window.destroy()
+
+    tk.Button(housing_window, text="Save Changes", command=save_housing).pack(pady=10)
+
+# Function to open the window for managing contacts
+def open_contacts_window(profile_name):
+    profile = next((p for p in profiles if p['name'] == profile_name), None)
+    if not profile:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' not found.")
+        return
+
+    contacts_window = tk.Toplevel()
+    contacts_window.title(f"Contacts for Profile: {profile_name}")
+
+    tk.Label(contacts_window, text="Contact Name:").pack(pady=10)
+    contact_name_entry = tk.Entry(contacts_window)
+    contact_name_entry.pack()
+
+    tk.Label(contacts_window, text="Phone Number:").pack(pady=10)
+    phone_number_entry = tk.Entry(contacts_window)
+    phone_number_entry.pack()
+
+    tk.Label(contacts_window, text="Email:").pack(pady=10)
+    email_entry = tk.Entry(contacts_window)
+    email_entry.pack()
+
+    def save_contact():
+        if 'contacts' not in profile:
+            profile['contacts'] = []
+        new_contact = {
+            'name': contact_name_entry.get(),
+            'phone_number': phone_number_entry.get(),
+            'email': email_entry.get()
+        }
+        profile['contacts'].append(new_contact)
+        save_to_json(profiles, PROFILES_FILE)
+        update_contacts_label(profile)
+        update_selected_profile_labels()  # Update labels after saving
+        contacts_window.destroy()
+
+    tk.Button(contacts_window, text="Save Contact", command=save_contact).pack(pady=10)
+
+def create_profile_window():
+    create_window = tk.Toplevel()
+    create_window.title("Create Profile")
+
+    tk.Label(create_window, text="Profile Name:").pack(pady=10)
+    profile_name_entry = tk.Entry(create_window)
+    profile_name_entry.pack()
+
+    def save_profile():
+        profile_name = profile_name_entry.get().strip()
+        if profile_name:
+            if any(p['name'] == profile_name for p in profiles):
+                messagebox.showwarning("Profile Exists", f"A profile named '{profile_name}' already exists.")
+            else:
+                profiles.append({'name': profile_name})
+                save_to_json(profiles, PROFILES_FILE)
+                profiles_listbox.insert(tk.END, profile_name)
+                create_window.destroy()
+        else:
+            messagebox.showwarning("Invalid Name", "Please enter a valid profile name.")
+
+    tk.Button(create_window, text="Save Profile", command=save_profile).pack(pady=10)
+
+def delete_profile_window():
+    delete_window = tk.Toplevel()
+    delete_window.title("Delete Profile")
+
+    tk.Label(delete_window, text="Select Profile to Delete:").pack(pady=10)
+
+    delete_listbox = tk.Listbox(delete_window, height=10, width=50)
+    delete_listbox.pack(pady=10)
+
+    for profile in profiles:
+        delete_listbox.insert(tk.END, profile['name'])
+
+    def delete_profile():
+        selected_profile = delete_listbox.get(tk.ACTIVE)
+        if selected_profile:
+            profiles[:] = [p for p in profiles if p['name'] != selected_profile]
+            save_to_json(profiles, PROFILES_FILE)
+            profiles_listbox.delete(tk.ACTIVE)
+            update_selected_profile_labels()  # Update labels after deleting
+            delete_window.destroy()
+        else:
+            messagebox.showwarning("No Selection", "Please select a profile to delete.")
+
+    tk.Button(delete_window, text="Delete Profile", command=delete_profile).pack(pady=10)
+
+def generate_pdf():
+    selected_profile_name = profiles_listbox.get(tk.ACTIVE)
+    if selected_profile_name:
+        profile = next((p for p in profiles if p['name'] == selected_profile_name), None)
+        if profile:
+            pdf_file = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
+            if pdf_file:
+                c = canvas.Canvas(pdf_file, pagesize=letter)
+                text = c.beginText(40, 750)
+                text.setFont("Helvetica", 12)
+
+                text_lines = [
+                    f"Profile Name: {profile.get('name', 'N/A')}",
+                    f"Banking Info: {profile.get('banking_info', 'N/A')}",
+                    f"Credit Debts: {profile.get('credit_debts', 'N/A')}",
+                    f"Vehicles: {profile.get('vehicles', 'N/A')}",
+                    f"Contacts: {profile.get('contacts', 'N/A')}",
+                    f"Documents: {profile.get('documents', 'N/A')}",
+                    f"Housing: {profile.get('housing', 'N/A')}",
+                    f"Housing2: {profile.get('housing2', 'N/A')}"
+                ]
+
+                for line in text_lines:
+                    text.textLine(line)
+
+                c.drawText(text)
+                c.showPage()
+                c.save()
+                messagebox.showinfo("Success", "PDF generated successfully!")
+        else:
+            messagebox.showwarning("Profile Not Found", "Profile not found.")
+    else:
+        messagebox.showwarning("No Selection", "Please select a profile.")
+
+def open_main_window():
+    global profiles_listbox, banking_info_label, credit_debts_label, vehicles_label, contacts_label, documents_label, housing_label, housing_label2
+
+    root = tk.Tk()
+    root.title("Profile Management")
+
+    # Profile List
+    profiles_listbox = tk.Listbox(root, width=50, height=15)
+    profiles_listbox.pack(pady=10)
+
+    def select_profile(event):
+        profile_name = profiles_listbox.get(profiles_listbox.curselection())
+        update_labels(next(p for p in profiles if p['name'] == profile_name))
+
+    profiles_listbox.bind("<<ListboxSelect>>", select_profile)
+
+    # Labels for profile sections
+    banking_info_label = tk.Label(root, text="Banking Info: ", font=("Helvetica", 12))
+    banking_info_label.pack(pady=5)
+
+    credit_debts_label = tk.Label(root, text="Insurance: ", font=("Helvetica", 12))
+    credit_debts_label.pack(pady=5)
+
+    vehicles_label = tk.Label(root, text="Vehicles: ", font=("Helvetica", 12))
+    vehicles_label.pack(pady=5)
+
+    contacts_label = tk.Label(root, text="Contacts: ", font=("Helvetica", 12))
+    contacts_label.pack(pady=5)
+
+    documents_label = tk.Label(root, text="Pets and Livestock: ", font=("Helvetica", 12))
+    documents_label.pack(pady=5)
+
+    housing_label = tk.Label(root, text="Housing: ", font=("Helvetica", 12))
+    housing_label.pack(pady=5)
+
+    housing_label2 = tk.Label(root, text="Biographical Info: ", font=("Helvetica", 12))
+    housing_label2.pack(pady=5)
+
+    # Buttons
+    tk.Button(root, text="Create Profile", command=create_profile_window).pack(pady=5)
+    tk.Button(root, text="Delete Profile", command=delete_profile_window).pack(pady=5)
+    tk.Button(root, text="Open Banking Info", command=lambda: open_banking_info_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
+    tk.Button(root, text="Open Insurance", command=lambda: open_credit_debts_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
+    tk.Button(root, text="Open Vehicles", command=lambda: open_vehicles_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
+    tk.Button(root, text="Open Contacts", command=lambda: open_contacts_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
+    tk.Button(root, text="Open Pets and Livestock", command=lambda: open_documents_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
+    tk.Button(root, text="Open Housing", command=lambda: open_housing_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
+    tk.Button(root, text="Open Biographical Information", command=lambda: open_housing_window2(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
+    tk.Button(root, text="Generate PDF", command=generate_pdf).pack(pady=5)
+    # Load profiles into listbox
+    update_profiles_listbox()
+
+    # Main loop
+    root.mainloop()
+
+
+open_main_window()
