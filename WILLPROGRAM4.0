@@ -771,6 +771,7 @@ tk.Button(root, text="Delete Profile", command=delete_profile_window).pack(pady=
 tk.Button(root, text="Open Banking Info", command=lambda: open_banking_info_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
 tk.Button(root, text="Open Banking Info2", command=lambda: open_banking_info_window2(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
 tk.Button(root, text="Open Banking Info3", command=lambda: open_banking_info_window3(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
+tk.Button(root, text="Open Banking Info4", command=lambda: open_banking_info_window3(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
 tk.Button(root, text="Open Contacts", command=lambda: open_contacts_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
 tk.Button(root, text="Open Pets and Livestock", command=lambda: open_documents_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
 tk.Button(root, text="Open Housing", command=lambda: open_housing_window(profiles_listbox.get(profiles_listbox.curselection()))).pack(pady=5)
