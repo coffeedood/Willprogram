@@ -1,0 +1,480 @@
+import tkinter as tk
+from tkinter import messagebox, filedialog
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+import json
+import os
+
+# File paths
+PROFILES_FILE = "profiles.json"
+
+# Function to load profiles from JSON file
+def load_profiles():
+    if os.path.exists(PROFILES_FILE):
+        try:
+            with open(PROFILES_FILE, "r") as file:
+                return json.load(file)
+        except json.JSONDecodeError:
+            messagebox.showwarning("Error", "The profiles file is corrupted or contains invalid JSON.")
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred while loading profiles: {e}")
+    else:
+        messagebox.showinfo("Info", "No profiles file found. Starting with an empty list.")
+    return []
+
+# Function to save profiles to JSON file
+def save_to_json(profiles, filename):
+    with open(filename, "w") as file:
+        json.dump(profiles, file, indent=4)
+
+# Initialize profiles
+profiles = load_profiles()
+
+# Function to create a new profile
+def create_profile_window():
+    create_window = tk.Toplevel()
+    create_window.title("Create New Profile")
+
+    tk.Label(create_window, text="Profile Name:").pack(pady=10)
+    name_entry = tk.Entry(create_window)
+    name_entry.pack()
+
+    def save_profile():
+        profile_name = name_entry.get()
+        if not profile_name:
+            messagebox.showwarning("Input Error", "Profile name cannot be empty.")
+            return
+
+        if any(p['name'] == profile_name for p in profiles):
+            messagebox.showwarning("Profile Exists", f"Profile '{profile_name}' already exists.")
+            return
+
+        new_profile = {
+            'name': profile_name,
+            'vehicles': [],
+            'contacts': [],
+        }
+        profiles.append(new_profile)
+        save_to_json(profiles, PROFILES_FILE)
+        profiles_listbox.insert(tk.END, profile_name)
+        create_window.destroy()
+
+    tk.Button(create_window, text="Save Profile", command=save_profile).pack(pady=10)
+
+# Function to delete a highlighted profile
+def delete_profile():
+    selected_index = profiles_listbox.curselection()
+    if not selected_index:
+        messagebox.showwarning("Selection Error", "No profile selected.")
+        return
+
+    selected_index = selected_index[0]
+    selected_profile = profiles[selected_index]
+    
+    # Confirm profile deletion
+    confirm = messagebox.askyesno("Delete Profile", f"Are you sure you want to delete '{selected_profile['name']}'?")
+    if confirm:
+        profiles.pop(selected_index)
+        save_to_json(profiles, PROFILES_FILE)
+        
+        # Update the listbox
+        profiles_listbox.delete(selected_index)
+        update_selected_profile_labels()  # Clear the labels after deletion
+
+def open_contacts_window(profile_name):
+    profile = next((p for p in profiles if p['name'] == profile_name), None)
+    if not profile:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' not found.")
+        return
+
+    contacts_window = tk.Toplevel()
+    contacts_window.title(f"Contacts for Profile: {profile_name}")
+
+    # Set contacts_window to be on top of the root window
+    contacts_window.transient(root)
+    contacts_window.grab_set()  # Disable interaction with the main window
+    contacts_window.focus()  # Focus on the contacts window
+
+    contacts_list = tk.Listbox(contacts_window, width=50, height=20)
+    contacts_list.pack(side=tk.LEFT, fill=tk.Y)
+
+    scrollbar = tk.Scrollbar(contacts_window)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    contacts_list.configure(yscrollcommand=scrollbar.set)
+    scrollbar.configure(command=contacts_list.yview)
+
+    def print_contacts():
+        contacts_list.delete(0, tk.END)
+        for contact in profile.get('contacts', []):
+            contact_info = f"Name: {contact['name']}, Email: {contact.get('email', '')}, Phone: {contact.get('phone', '')}"
+            contacts_list.insert(tk.END, contact_info)
+
+    def add_contact():
+        def create_add_contact_window():
+            add_contact_window = tk.Toplevel()
+            add_contact_window.title("Add Contact")
+            add_contact_window.transient(contacts_window)  # Make sure this window stays in front of the contacts window
+            add_contact_window.grab_set()  # Ensure the new window is active
+            add_contact_window.focus()  # Focus on the add contact window
+
+            tk.Label(add_contact_window, text="Name:").pack(pady=10)
+            name_entry = tk.Entry(add_contact_window)
+            name_entry.pack()
+
+            tk.Label(add_contact_window, text="Email Address:").pack(pady=10)
+            email_entry = tk.Entry(add_contact_window)
+            email_entry.pack()
+
+            tk.Label(add_contact_window, text="Phone Number:").pack(pady=10)
+            phone_entry = tk.Entry(add_contact_window)
+            phone_entry.pack()
+
+            def save_contact():
+                if 'contacts' not in profile:
+                    profile['contacts'] = []  # Initialize 'contacts' list if it doesn't exist
+                contact = {
+                    'name': name_entry.get(),
+                    'email': email_entry.get(),
+                    'phone': phone_entry.get()
+                }
+                profile['contacts'].append(contact)
+                save_to_json(profiles, PROFILES_FILE)
+                messagebox.showinfo("Success", "Contact added successfully!")
+                print_contacts()  # Update the contacts listbox after adding a new contact
+
+                # Ask user if they want to add another contact
+                create_another = messagebox.askyesno("Add Another Contact", "Do you want to add another contact?")
+                if create_another:
+                    add_contact_window.destroy()  # Close the current window
+                    root.after(100, create_add_contact_window)  # Open a new "Add Contact" window with a delay
+                else:
+                    add_contact_window.destroy()  # Close the "Add Contact" window
+                    root.after(100, lambda: (contacts_window.deiconify(), contacts_window.lift(), contacts_window.focus_set()))  # Restore and focus on the contacts window
+
+            tk.Button(add_contact_window, text="Save Contact", command=save_contact).pack(pady=20)
+
+            name_entry.focus_set()  # Set focus to the name entry field
+
+        create_add_contact_window()
+
+    def edit_contact():
+        selected_index = contacts_list.curselection()
+        if not selected_index:
+            messagebox.showwarning("Selection Error", "No contact selected.")
+            return
+
+        selected_index = selected_index[0]
+        selected_contact = profile['contacts'][selected_index]
+
+        def create_edit_contact_window():
+            edit_contact_window = tk.Toplevel()
+            edit_contact_window.title("Edit Contact")
+            edit_contact_window.transient(contacts_window)  # Keep window in front
+            edit_contact_window.grab_set()  # Make this window modal
+            edit_contact_window.focus()  # Focus on the edit window
+
+            tk.Label(edit_contact_window, text="Name:").pack(pady=10)
+            name_entry = tk.Entry(edit_contact_window)
+            name_entry.insert(0, selected_contact['name'])
+            name_entry.pack()
+
+            tk.Label(edit_contact_window, text="Email Address:").pack(pady=10)
+            email_entry = tk.Entry(edit_contact_window)
+            email_entry.insert(0, selected_contact.get('email', ''))
+            email_entry.pack()
+
+            tk.Label(edit_contact_window, text="Phone Number:").pack(pady=10)
+            phone_entry = tk.Entry(edit_contact_window)
+            phone_entry.insert(0, selected_contact.get('phone', ''))
+            phone_entry.pack()
+
+            def save_edits():
+                profile['contacts'][selected_index] = {
+                    'name': name_entry.get(),
+                    'email': email_entry.get(),
+                    'phone': phone_entry.get()
+                }
+                save_to_json(profiles, PROFILES_FILE)
+                messagebox.showinfo("Success", "Contact updated successfully!")
+                print_contacts()  # Refresh the contacts listbox
+                edit_contact_window.destroy()
+
+            tk.Button(edit_contact_window, text="Save Changes", command=save_edits).pack(pady=20)
+
+        create_edit_contact_window()
+
+    import tkinter.filedialog as filedialog
+
+    def generate_pdf():
+        # Open a file dialog to ask the user where to save the PDF
+        pdf_filename = filedialog.asksaveasfilename(
+            defaultextension=".pdf", 
+            filetypes=[("PDF files", "*.pdf")],
+            title="Save PDF As"
+        )
+        
+        if not pdf_filename:  # If the user cancels, exit the function
+            return
+        
+        c = canvas.Canvas(pdf_filename, pagesize=letter)
+        width, height = letter
+
+        c.drawString(100, height - 50, f"Contacts for Profile: {profile_name}")
+        y_position = height - 100
+
+        for contact in profile.get('contacts', []):
+            contact_info = f"Name: {contact['name']}, Email: {contact.get('email', '')}, Phone: {contact.get('phone', '')}"
+            c.drawString(100, y_position, contact_info)
+            y_position -= 20
+            if y_position < 50:  # Create a new page if space runs out
+                c.showPage()
+                y_position = height - 50
+
+        c.save()
+        messagebox.showinfo("Success", f"PDF saved as {pdf_filename}")
+
+    # Adding this to the contacts window
+    tk.Button(contacts_window, text="Generate PDF", command=generate_pdf).pack(pady=5)
+
+
+    tk.Button(contacts_window, text="Add Contact", command=add_contact).pack(pady=5)
+    tk.Button(contacts_window, text="Edit Contact", command=edit_contact).pack(pady=5)
+
+    print_contacts()
+
+    # Ensure the contacts window stays in front of the profile manager window
+    contacts_window.protocol("WM_DELETE_WINDOW", lambda: (contacts_window.grab_release(), contacts_window.destroy()))
+
+
+def open_contacts2_window(profile_name):
+    profile = next((p for p in profiles if p['name'] == profile_name), None)
+    if not profile:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' not found.")
+        return
+
+    contacts2_window = tk.Toplevel()
+    contacts2_window.title(f"contacts2 for Profile: {profile_name}")
+
+    # Set contacts2_window to be on top of the root window
+    contacts2_window.transient(root)
+    contacts2_window.grab_set()  # Disable interaction with the main window
+    contacts2_window.focus()  # Focus on the contacts2 window
+
+    contacts2_list = tk.Listbox(contacts2_window, width=50, height=20)
+    contacts2_list.pack(side=tk.LEFT, fill=tk.Y)
+
+    scrollbar = tk.Scrollbar(contacts2_window)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    contacts2_list.configure(yscrollcommand=scrollbar.set)
+    scrollbar.configure(command=contacts2_list.yview)
+
+    def print_contacts2():
+        contacts2_list.delete(0, tk.END)
+        for contact in profile.get('contacts2', []):
+            contact_info = f"Name: {contact['name']}, Email: {contact.get('email', '')}, Phone: {contact.get('phone', '')}"
+            contacts2_list.insert(tk.END, contact_info)
+
+    def add_contact():
+        def create_add_contact_window():
+            add_contact_window = tk.Toplevel()
+            add_contact_window.title("Add Contact")
+            add_contact_window.transient(contacts2_window)  # Make sure this window stays in front of the contacts2 window
+            add_contact_window.grab_set()  # Ensure the new window is active
+            add_contact_window.focus()  # Focus on the add contact window
+
+            tk.Label(add_contact_window, text="Name:").pack(pady=10)
+            name_entry = tk.Entry(add_contact_window)
+            name_entry.pack()
+
+            tk.Label(add_contact_window, text="Email Address:").pack(pady=10)
+            email_entry = tk.Entry(add_contact_window)
+            email_entry.pack()
+
+            tk.Label(add_contact_window, text="Phone Number:").pack(pady=10)
+            phone_entry = tk.Entry(add_contact_window)
+            phone_entry.pack()
+
+            def save_contact():
+                if 'contacts2' not in profile:
+                    profile['contacts2'] = []  # Initialize 'contacts2' list if it doesn't exist
+                contact = {
+                    'name': name_entry.get(),
+                    'email': email_entry.get(),
+                    'phone': phone_entry.get()
+                }
+                profile['contacts2'].append(contact)
+                save_to_json(profiles, PROFILES_FILE)
+                messagebox.showinfo("Success", "Contact added successfully!")
+                print_contacts2()  # Update the contacts2 listbox after adding a new contact
+
+                # Ask user if they want to add another contact
+                create_another = messagebox.askyesno("Add Another Contact", "Do you want to add another contact?")
+                if create_another:
+                    add_contact_window.destroy()  # Close the current window
+                    root.after(100, create_add_contact_window)  # Open a new "Add Contact" window with a delay
+                else:
+                    add_contact_window.destroy()  # Close the "Add Contact" window
+                    root.after(100, lambda: (contacts2_window.deiconify(), contacts2_window.lift(), contacts2_window.focus_set()))  # Restore and focus on the contacts2 window
+
+            tk.Button(add_contact_window, text="Save Contact", command=save_contact).pack(pady=20)
+
+            name_entry.focus_set()  # Set focus to the name entry field
+
+        create_add_contact_window()
+
+    def edit_contact():
+        selected_index = contacts2_list.curselection()
+        if not selected_index:
+            messagebox.showwarning("Selection Error", "No contact selected.")
+            return
+
+        selected_index = selected_index[0]
+        selected_contact = profile['contacts2'][selected_index]
+
+        def create_edit_contact_window():
+            edit_contact_window = tk.Toplevel()
+            edit_contact_window.title("Edit Contact")
+            edit_contact_window.transient(contacts2_window)  # Keep window in front
+            edit_contact_window.grab_set()  # Make this window modal
+            edit_contact_window.focus()  # Focus on the edit window
+
+            tk.Label(edit_contact_window, text="Name:").pack(pady=10)
+            name_entry = tk.Entry(edit_contact_window)
+            name_entry.insert(0, selected_contact['name'])
+            name_entry.pack()
+
+            tk.Label(edit_contact_window, text="Email Address:").pack(pady=10)
+            email_entry = tk.Entry(edit_contact_window)
+            email_entry.insert(0, selected_contact.get('email', ''))
+            email_entry.pack()
+
+            tk.Label(edit_contact_window, text="Phone Number:").pack(pady=10)
+            phone_entry = tk.Entry(edit_contact_window)
+            phone_entry.insert(0, selected_contact.get('phone', ''))
+            phone_entry.pack()
+
+            def save_edits():
+                profile['contacts2'][selected_index] = {
+                    'name': name_entry.get(),
+                    'email': email_entry.get(),
+                    'phone': phone_entry.get()
+                }
+                save_to_json(profiles, PROFILES_FILE)
+                messagebox.showinfo("Success", "Contact updated successfully!")
+                print_contacts2()  # Refresh the contacts2 listbox
+                edit_contact_window.destroy()
+
+            tk.Button(edit_contact_window, text="Save Changes", command=save_edits).pack(pady=20)
+
+        create_edit_contact_window()
+
+    import tkinter.filedialog as filedialog
+
+    def generate_pdf():
+        # Open a file dialog to ask the user where to save the PDF
+        pdf_filename = filedialog.asksaveasfilename(
+            defaultextension=".pdf", 
+            filetypes=[("PDF files", "*.pdf")],
+            title="Save PDF As"
+        )
+        
+        if not pdf_filename:  # If the user cancels, exit the function
+            return
+        
+        c = canvas.Canvas(pdf_filename, pagesize=letter)
+        width, height = letter
+
+        c.drawString(100, height - 50, f"contacts2 for Profile: {profile_name}")
+        y_position = height - 100
+
+        for contact in profile.get('contacts2', []):
+            contact_info = f"Name: {contact['name']}, Email: {contact.get('email', '')}, Phone: {contact.get('phone', '')}"
+            c.drawString(100, y_position, contact_info)
+            y_position -= 20
+            if y_position < 50:  # Create a new page if space runs out
+                c.showPage()
+                y_position = height - 50
+
+        c.save()
+        messagebox.showinfo("Success", f"PDF saved as {pdf_filename}")
+
+    # Adding this to the contacts2 window
+    tk.Button(contacts2_window, text="Generate PDF", command=generate_pdf).pack(pady=5)
+
+
+    tk.Button(contacts2_window, text="Add Contact", command=add_contact).pack(pady=5)
+    tk.Button(contacts2_window, text="Edit Contact", command=edit_contact).pack(pady=5)
+
+    print_contacts2()
+
+    # Ensure the contacts2 window stays in front of the profile manager window
+    contacts2_window.protocol("WM_DELETE_WINDOW", lambda: (contacts2_window.grab_release(), contacts2_window.destroy()))
+
+
+
+def update_selected_profile_labels():
+    selected_index = profiles_listbox.curselection()
+    if selected_index:
+        selected_profile = profiles[selected_index[0]]
+        # Check if the profile has any contacts
+        if selected_profile.get('contacts'):
+            contact_status_label.config(text="Complete", fg="green")
+        else:
+            contact_status_label.config(text="Incomplete", fg="red")
+    else:
+        contact_status_label.config(text="Incomplete", fg="red")
+
+# Create main window
+root = tk.Tk()
+root.title("Profile Manager")
+root.geometry("600x400")
+
+
+# Frame for the profile list
+
+# Frame for the profile list
+profiles_frame = tk.Frame(root)
+profiles_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
+
+# Create the profiles listbox
+profiles_listbox = tk.Listbox(profiles_frame)
+profiles_listbox.pack(side=tk.LEFT, fill=tk.Y)
+
+# Add profiles to the listbox
+for profile in profiles:
+    profiles_listbox.insert(tk.END, profile['name'])
+
+# Scrollbar for the profile listbox
+scrollbar = tk.Scrollbar(profiles_frame)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+profiles_listbox.config(yscrollcommand=scrollbar.set)
+scrollbar.config(command=profiles_listbox.yview)
+
+# Bind event to update selected profile labels
+profiles_listbox.bind("<<ListboxSelect>>", lambda e: update_selected_profile_labels())
+
+# Frame for buttons (center of the window)
+button_frame = tk.Frame(root)
+button_frame.pack(expand=True)
+
+# Stacked buttons in the center frame, using grid for alignment
+create_button = tk.Button(button_frame, text="Create Profile", command=create_profile_window)
+create_button.grid(row=0, column=0, padx=10, pady=5)
+
+delete_button = tk.Button(button_frame, text="Delete Profile", command=delete_profile)
+delete_button.grid(row=1, column=0, padx=10, pady=5)
+
+# "Manage Contacts" button
+manage_contacts_button = tk.Button(button_frame, text="Manage Contacts", command=lambda: open_contacts_window(profiles[profiles_listbox.curselection()[0]]['name'] if profiles_listbox.curselection() else None))
+manage_contacts_button.grid(row=2, column=0, padx=10, pady=5)
+
+
+
+# "Complete/Incomplete" label next to the "Manage Contacts" button
+contact_status_label = tk.Label(button_frame, text="Incomplete", fg="red")
+contact_status_label.grid(row=2, column=1, padx=10, pady=5)  # Placed next to Manage Contacts button
+
+# Start the main loop
+root.mainloop()
