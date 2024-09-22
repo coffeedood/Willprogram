@@ -1,0 +1,734 @@
+import tkinter as tk
+from tkinter import messagebox
+import json
+import os
+import tkinter as tk
+from tkinter import messagebox, filedialog
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+import json
+import os
+
+PROFILES_FILE = "profiles.json"
+profiles = []
+
+# Load images as text placeholders
+CHECKMARK = "✔"
+XMARK = "✘"
+
+# Function to save data to JSON
+def save_to_json(data, filename):
+    try:
+        with open(filename, 'w') as file:
+            json.dump(data, file, indent=4)
+    except IOError:
+        messagebox.showerror("Error", "Could not save data to file.")
+
+# Function to load data from JSON
+def load_from_json(filename):
+    if os.path.exists(filename):
+        try:
+            with open(filename, 'r') as file:
+                data = json.load(file)
+                if isinstance(data, list):
+                    return [p for p in data if isinstance(p, dict)]
+        except IOError:
+            messagebox.showerror("Error", "Could not load data from file.")
+    return []
+
+# Load profiles from JSON on startup
+profiles = load_from_json(PROFILES_FILE)
+
+# Function to update status labels
+def update_status_label(label, is_complete):
+    status_text = f"{CHECKMARK if is_complete else XMARK} {'Complete' if is_complete else 'Incomplete'}"
+    label.config(text=status_text, fg="green" if is_complete else "red")
+
+def open_contacts_window(profile_name):
+    profile = next((p for p in profiles if p['name'] == profile_name), None)
+    if not profile:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' not found.")
+        return
+
+    contacts_window = tk.Toplevel()
+    contacts_window.title(f"Contacts for Profile: {profile_name}")
+
+    # Set contacts_window to be on top of the root window
+    contacts_window.transient(root)
+    contacts_window.grab_set()  # Disable interaction with the main window
+    contacts_window.focus()  # Focus on the contacts window
+
+    contacts_list = tk.Listbox(contacts_window, width=50, height=20)
+    contacts_list.pack(side=tk.LEFT, fill=tk.Y)
+
+    scrollbar = tk.Scrollbar(contacts_window)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    contacts_list.configure(yscrollcommand=scrollbar.set)
+    scrollbar.configure(command=contacts_list.yview)
+
+    def print_contacts():
+        contacts_list.delete(0, tk.END)
+        for contact in profile.get('contacts', []):
+            contact_info = f"Name: {contact['name']}, Email: {contact.get('email', '')}, Phone: {contact.get('phone', '')}"
+            contacts_list.insert(tk.END, contact_info)
+
+    def add_contact():
+        def create_add_contact_window():
+            add_contact_window = tk.Toplevel()
+            add_contact_window.title("Add Contact")
+            add_contact_window.transient(contacts_window)  # Make sure this window stays in front of the contacts window
+            add_contact_window.grab_set()  # Ensure the new window is active
+            add_contact_window.focus()  # Focus on the add contact window
+
+            tk.Label(add_contact_window, text="Name:").pack(pady=10)
+            name_entry = tk.Entry(add_contact_window)
+            name_entry.pack()
+
+            tk.Label(add_contact_window, text="Email Address:").pack(pady=10)
+            email_entry = tk.Entry(add_contact_window)
+            email_entry.pack()
+
+            tk.Label(add_contact_window, text="Phone Number:").pack(pady=10)
+            phone_entry = tk.Entry(add_contact_window)
+            phone_entry.pack()
+
+            def save_contact():
+                if 'contacts' not in profile:
+                    profile['contacts'] = []
+                new_contact = {
+                    'name': name_entry.get(),
+                    'phone': phone_entry.get(),
+                    'email': email_entry.get()
+                }
+                profile['contacts'].append(new_contact)
+                save_to_json(profiles, PROFILES_FILE)
+                print_contacts()
+                update_contacts_label(profile)
+
+                add_another = messagebox.askyesno("Add Another", "Would you like to add another contact?")
+                if add_another:
+                    name_entry.delete(0, tk.END)
+                    phone_entry.delete(0, tk.END)
+                    email_entry.delete(0, tk.END)
+                    name_entry.focus_set()  # Refocus on the name entry for the next contact
+                else:
+                    add_contact_window.destroy()
+                    contacts_window.focus_set()  # Return focus to the contacts window
+
+            tk.Button(add_contact_window, text="Save Contact", command=save_contact).pack(pady=10)
+
+            name_entry.focus_set()  # Set focus to the name entry field
+
+        create_add_contact_window()
+
+    def edit_contact():
+        selected_index = contacts_list.curselection()
+        if not selected_index:
+            messagebox.showwarning("Selection Error", "No contact selected.")
+            return
+
+        selected_index = selected_index[0]
+        selected_contact = profile['contacts'][selected_index]
+
+        def create_edit_contact_window():
+            edit_contact_window = tk.Toplevel()
+            edit_contact_window.title("Edit Contact")
+            edit_contact_window.transient(contacts_window)  # Keep window in front
+            edit_contact_window.grab_set()  # Make this window modal
+            edit_contact_window.focus()  # Focus on the edit window
+
+            tk.Label(edit_contact_window, text="Name:").pack(pady=10)
+            name_entry = tk.Entry(edit_contact_window)
+            name_entry.insert(0, selected_contact['name'])
+            name_entry.pack()
+
+            tk.Label(edit_contact_window, text="Email Address:").pack(pady=10)
+            email_entry = tk.Entry(edit_contact_window)
+            email_entry.insert(0, selected_contact.get('email', ''))
+            email_entry.pack()
+
+            tk.Label(edit_contact_window, text="Phone Number:").pack(pady=10)
+            phone_entry = tk.Entry(edit_contact_window)
+            phone_entry.insert(0, selected_contact.get('phone', ''))
+            phone_entry.pack()
+
+            def save_edits():
+                profile['contacts'][selected_index] = {
+                    'name': name_entry.get(),
+                    'email': email_entry.get(),
+                    'phone': phone_entry.get()
+                }
+                save_to_json(profiles, PROFILES_FILE)
+                messagebox.showinfo("Success", "Contact updated successfully!")
+                print_contacts()  # Refresh the contacts listbox
+                edit_contact_window.destroy()
+
+            tk.Button(edit_contact_window, text="Save Changes", command=save_edits).pack(pady=20)
+
+        create_edit_contact_window()
+
+    import tkinter.filedialog as filedialog
+
+    def generate_pdf():
+        # Open a file dialog to ask the user where to save the PDF
+        pdf_filename = filedialog.asksaveasfilename(
+            defaultextension=".pdf", 
+            filetypes=[("PDF files", "*.pdf")],
+            title="Save PDF As"
+        )
+        
+        if not pdf_filename:  # If the user cancels, exit the function
+            return
+        
+        c = canvas.Canvas(pdf_filename, pagesize=letter)
+        width, height = letter
+
+        c.drawString(100, height - 50, f"Contacts for Profile: {profile_name}")
+        y_position = height - 100
+
+        for contact in profile.get('contacts', []):
+            contact_info = f"Name: {contact['name']}, Email: {contact.get('email', '')}, Phone: {contact.get('phone', '')}"
+            c.drawString(100, y_position, contact_info)
+            y_position -= 20
+            if y_position < 50:  # Create a new page if space runs out
+                c.showPage()
+                y_position = height - 50
+
+        c.save()
+        messagebox.showinfo("Success", f"PDF saved as {pdf_filename}")
+
+    # Adding this to the contacts window
+    tk.Button(contacts_window, text="Generate PDF", command=generate_pdf).pack(pady=5)
+
+
+    tk.Button(contacts_window, text="Add Contact", command=add_contact).pack(pady=5)
+    tk.Button(contacts_window, text="Edit Contact", command=edit_contact).pack(pady=5)
+
+    print_contacts()
+
+    # Ensure the contacts window stays in front of the profile manager window
+    contacts_window.protocol("WM_DELETE_WINDOW", lambda: (contacts_window.grab_release(), contacts_window.destroy()))
+
+
+def create_profile_window():
+    create_window = tk.Toplevel()
+    create_window.title("Create New Profile")
+
+    tk.Label(create_window, text="Profile Name:").pack(pady=10)
+    name_entry = tk.Entry(create_window)
+    name_entry.pack()
+
+    def save_profile():
+        profile_name = name_entry.get()
+        if not profile_name:
+            messagebox.showwarning("Input Error", "Profile name cannot be empty.")
+            return
+
+        if any(p['name'] == profile_name for p in profiles):
+            messagebox.showwarning("Profile Exists", f"Profile '{profile_name}' already exists.")
+            return
+
+        new_profile = {
+            'name': profile_name,
+            'vehicles': [],
+            'contacts': [],
+            'documents': [],
+            'housing': None,  # Make housing initially None
+            'housing2': None,  # Make housing2 initially None
+            'banking_info': [],
+            'credit_debts': []
+        }
+        profiles.append(new_profile)
+        save_to_json(profiles, PROFILES_FILE)
+        profiles_listbox.insert(tk.END, profile_name)
+        create_window.destroy()
+
+    tk.Button(create_window, text="Save Profile", command=save_profile).pack(pady=10)
+
+
+def open_contact2s2_window(profile_name):
+    profile = next((p for p in profiles if p['name'] == profile_name), None)
+    if not profile:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' not found.")
+        return
+
+    contact2s2_window = tk.Toplevel()
+    contact2s2_window.title(f"contact2s2 for Profile: {profile_name}")
+
+    # Make the contact2s2 window modal and keep it focused
+    contact2s2_window.grab_set()
+    contact2s2_window.focus_set()
+
+    contact2s2_list = tk.Listbox(contact2s2_window, width=50, height=20)
+    contact2s2_list.pack(side=tk.LEFT, fill=tk.Y)
+
+    scrollbar = tk.Scrollbar(contact2s2_window)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    contact2s2_list.configure(yscrollcommand=scrollbar.set)
+    scrollbar.configure(command=contact2s2_list.yview)
+
+    def print_contact2s2():
+        contact2s2_list.delete(0, tk.END)
+        for contact2 in profile.get('contact2s2', []):
+            contact2_info = f"Name: {contact2['name']}, Phone: {contact2.get('phone', 'N/A')}, Email: {contact2.get('email', 'N/A')}"
+            contact2s2_list.insert(tk.END, contact2_info)
+
+    def add_contact2():
+        add_contact2_window = tk.Toplevel()
+        add_contact2_window.title("Add contact2")
+        add_contact2_window.transient(contact2s2_window)  # Keep this window on top of the contact2s2 window
+
+        tk.Label(add_contact2_window, text="Name:").pack(pady=10)
+        name_entry = tk.Entry(add_contact2_window)
+        name_entry.pack()
+        name_entry.focus_set()  # Focus on the name entry field as soon as the window opens
+
+        tk.Label(add_contact2_window, text="Phone:").pack(pady=10)
+        phone_entry = tk.Entry(add_contact2_window)
+        phone_entry.pack()
+
+        tk.Label(add_contact2_window, text="Email:").pack(pady=10)
+        email_entry = tk.Entry(add_contact2_window)
+        email_entry.pack()
+
+        def save_contact2():
+            if 'contact2s2' not in profile:
+                profile['contact2s2'] = []
+            new_contact2 = {
+                'name': name_entry.get(),
+                'phone': phone_entry.get(),
+                'email': email_entry.get()
+            }
+            profile['contact2s2'].append(new_contact2)
+            save_to_json(profiles, PROFILES_FILE)
+            print_contact2s2()
+            update_contact2s2_label(profile)
+
+            add_another = messagebox.askyesno("Add Another", "Would you like to add another contact2?")
+            if add_another:
+                name_entry.delete(0, tk.END)
+                phone_entry.delete(0, tk.END)
+                email_entry.delete(0, tk.END)
+                name_entry.focus_set()  # Refocus on the name entry for the next contact2
+            else:
+                add_contact2_window.destroy()
+                contact2s2_window.focus_set()  # Return focus to the contact2s2 window
+
+        tk.Button(add_contact2_window, text="Save contact2", command=save_contact2).pack(pady=10)
+
+        # Ensure the add contact2 window keeps focus and is modal relative to the contact2s2 window
+        add_contact2_window.grab_set()
+        add_contact2_window.focus_set()
+
+    tk.Button(contact2s2_window, text="Add contact2", command=add_contact2).pack(pady=10)
+    print_contact2s2()
+
+def create_profile_window():
+    create_window = tk.Toplevel()
+    create_window.title("Create New Profile")
+
+    tk.Label(create_window, text="Profile Name:").pack(pady=10)
+    name_entry = tk.Entry(create_window)
+    name_entry.pack()
+
+    def save_profile():
+        profile_name = name_entry.get()
+        if not profile_name:
+            messagebox.showwarning("Input Error", "Profile name cannot be empty.")
+            return
+
+        if any(p['name'] == profile_name for p in profiles):
+            messagebox.showwarning("Profile Exists", f"Profile '{profile_name}' already exists.")
+            return
+
+        new_profile = {
+            'name': profile_name,
+            'vehicles': [],
+            'contact2s2': [],
+            'documents': [],
+            'housing': None,  # Make housing initially None
+            'housing2': None,  # Make housing2 initially None
+            'banking_info': [],
+            'credit_debts': []
+        }
+        profiles.append(new_profile)
+        save_to_json(profiles, PROFILES_FILE)
+        profiles_listbox.insert(tk.END, profile_name)
+        create_window.destroy()
+
+    tk.Button(create_window, text="Save Profile", command=save_profile).pack(pady=10)
+
+
+
+def open_banking_info_window(profile_name):
+    profile = next((p for p in profiles if isinstance(p, dict) and p['name'] == profile_name), None)
+    if not profile:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' not found.")
+        return
+
+    banking_window = tk.Toplevel()
+    banking_window.title(f"banking for Profile: {profile_name}")
+
+    banking_list = tk.Listbox(banking_window, width=50, height=20)
+    banking_list.pack(side=tk.LEFT, fill=tk.Y)
+
+    scrollbar = tk.Scrollbar(banking_window)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    banking_list.configure(yscrollcommand=scrollbar.set)
+    scrollbar.configure(command=banking_list.yview)
+
+    def print_banking():
+        banking_list.delete(0, tk.END)
+        for banking in profile.get('banking', []):
+            banking_info = f"Name: {banking['name']}, Email: {banking.get('email', '')}, Phone: {banking.get('phone', '')}"
+            banking_list.insert(tk.END, banking_info)
+
+    def add_banking():
+        add_banking_window = tk.Toplevel()
+        add_banking_window.title("Add banking")
+
+        tk.Label(add_banking_window, text="Name:").pack(pady=10)
+        name_entry = tk.Entry(add_banking_window)
+        name_entry.pack()
+
+        tk.Label(add_banking_window, text="Email Address:").pack(pady=10)
+        email_entry = tk.Entry(add_banking_window)
+        email_entry.pack()
+
+        tk.Label(add_banking_window, text="Phone Number:").pack(pady=10)
+        phone_entry = tk.Entry(add_banking_window)
+        phone_entry.pack()
+
+        def save_banking():
+            if 'banking' not in profile:
+                profile['banking'] = []  # Initialize 'banking' list if it doesn't exist
+            banking = {
+                'name': name_entry.get(),
+                'email': email_entry.get(),
+                'phone': phone_entry.get()
+            }
+            profile['banking'].append(banking)
+            save_to_json(profiles, PROFILES_FILE)
+            messagebox.showinfo("Success", "banking added successfully!")
+            print_banking()  # Update the banking listbox after adding a new banking
+            add_banking_window.destroy()
+
+        tk.Button(add_banking_window, text="Save banking", command=save_banking).pack(pady=20)
+
+
+    def edit_banking():
+        selected_index = banking_list.curselection()
+        if selected_index:
+            selected_banking = profile['banking'][selected_index[0]]
+            edit_banking_window = tk.Toplevel()
+            edit_banking_window.title("Edit banking")
+
+            tk.Label(edit_banking_window, text="Name:").pack(pady=10)
+            name_entry_edit = tk.Entry(edit_banking_window)
+            name_entry_edit.insert(0, selected_banking['name'])
+            name_entry_edit.pack()
+
+            tk.Label(edit_banking_window, text="Email Address:").pack(pady=10)
+            email_entry_edit = tk.Entry(edit_banking_window)
+            email_entry_edit.insert(0, selected_banking.get('email', ''))
+            email_entry_edit.pack()
+
+            tk.Label(edit_banking_window, text="Phone Number:").pack(pady=10)
+            phone_entry_edit = tk.Entry(edit_banking_window)
+            phone_entry_edit.insert(0, selected_banking.get('phone', ''))
+            phone_entry_edit.pack()
+
+            def save_changes():
+                selected_banking['name'] = name_entry_edit.get()
+                selected_banking['email'] = email_entry_edit.get()
+                selected_banking['phone'] = phone_entry_edit.get()
+                save_to_json(profiles, PROFILES_FILE)
+                messagebox.showinfo("Success", "banking updated successfully!")
+                print_banking()  # Update the banking listbox after editing a banking
+                edit_banking_window.destroy()
+
+            tk.Button(edit_banking_window, text="Save Changes", command=save_changes).pack(pady=20)
+        else:
+            messagebox.showwarning("No banking Selected", "Please select a banking to edit.")
+
+    def generate_pdf():
+        pdf_filename = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
+        if pdf_filename:
+            c = canvas.Canvas(pdf_filename, pagesize=letter)
+            c.drawString(100, 750, f"Profile Information for: {profile_name}")
+            y_position = 720
+
+            # Print profile details
+            for key, value in profile.items():
+                if key == 'banking':
+                    continue  # Skip printing banking here
+                if isinstance(value, list) or isinstance(value, dict):
+                    value = json.dumps(value, indent=4)
+                profile_info = f"{key}: {value}"
+                c.drawString(100, y_position, profile_info)
+                y_position -= 20
+
+            # Print banking information
+            c.drawString(100, y_position, "banking:")
+            y_position -= 20
+            for banking in profile.get('banking', []):
+                banking_info = f"Name: {banking['name']}, Email: {banking.get('email', '')}, Phone: {banking.get('phone', '')}"
+                c.drawString(100, y_position, banking_info)
+                y_position -= 20
+
+            c.save()
+            messagebox.showinfo("PDF Generated", f"PDF generated successfully at {pdf_filename}")
+
+    tk.Button(banking_window, text="Add banking", command=add_banking).pack(pady=5)
+    tk.Button(banking_window, text="Edit banking", command=edit_banking).pack(pady=5)
+    tk.Button(banking_window, text="Generate PDF", command=generate_pdf).pack(pady=5)
+    
+    print_banking()
+    
+
+# Function to delete a highlighted profile
+def delete_profile():
+    selected_index = profiles_listbox.curselection()
+    if not selected_index:
+        messagebox.showwarning("Selection Error", "No profile selected.")
+        return
+
+    selected_index = selected_index[0]
+    selected_profile = profiles[selected_index]
+    
+    # Confirm profile deletion
+    confirm = messagebox.askyesno("Delete Profile", f"Are you sure you want to delete '{selected_profile['name']}'?")
+    if confirm:
+        profiles.pop(selected_index)
+        save_to_json(profiles, PROFILES_FILE)
+        
+        # Update the listbox
+        profiles_listbox.delete(selected_index)
+        update_selected_profile_labels()  # Clear the labels after deletion
+
+# Function to update labels based on the profile
+def update_labels(profile):
+    update_banking_info_label(profile)
+    update_credit_debts_label(profile)
+    update_contacts_label(profile)
+    update_contact2s2_label(profile)
+    update_documents_label(profile)
+    update_housing_label(profile)
+    update_housing_label2(profile)
+
+def update_banking_info_label(profile):
+    is_complete = profile and profile.get('banking')  # Checks if there's any banking info
+    update_status_label(banking_info_label, bool(is_complete))
+
+def update_credit_debts_label(profile):
+    is_complete = profile and profile.get('credit_debts')  # Checks if there's any credit debts
+    update_status_label(credit_debts_label, bool(is_complete))
+
+def update_contacts_label(profile):
+    is_complete = profile and profile.get('contacts')  # Checks if there's any contacts
+    update_status_label(contacts_label, bool(is_complete))
+
+def update_contact2s2_label(profile):
+    is_complete = profile and profile.get('contact2s2')  # Checks if there's any contacts
+    update_status_label(contacts_label2, bool(is_complete))
+
+def update_documents_label(profile):
+    is_complete = profile and profile.get('documents')  # Checks if there are any documents
+    update_status_label(documents_label, bool(is_complete))
+
+def update_housing_label(profile):
+    is_complete = profile and profile.get('housing')  # Checks if housing data exists
+    update_status_label(housing_label, bool(is_complete))
+
+def update_housing_label2(profile):
+    is_complete = profile and profile.get('housing2')  # Checks if housing2 data exists
+    update_status_label(housing_label2, bool(is_complete))
+
+def generate_pdf():
+    selected_index = profiles_listbox.curselection()
+    if not selected_index:
+        messagebox.showwarning("Selection Error", "No profile selected.")
+        return
+
+    profile = profiles[selected_index[0]]
+    pdf_file = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")], initialfile=f"{profile['name']}_profile.pdf")
+    
+    if not pdf_file:
+        return
+
+    # Create a canvas for the PDF
+    c = canvas.Canvas(pdf_file, pagesize=letter)
+    width, height = letter
+
+    # Define some margin and text wrapping configurations
+    margin_x = 50  # Left and right margin
+    margin_y = 50  # Top and bottom margin
+    max_text_width = width - 2 * margin_x  # Width available for text
+
+    # Start drawing the profile info
+    y = height - margin_y  # Starting position at the top of the page
+
+    # Utility function to wrap text to fit within the margins
+    def draw_wrapped_text(text, y, c, max_width, line_height=15):
+        lines = []
+        while text:
+            split_index = len(text)
+            while c.stringWidth(text[:split_index]) > max_width and split_index > 0:
+                split_index -= 1
+            lines.append(text[:split_index])
+            text = text[split_index:].lstrip()
+        for line in lines:
+            if y < margin_y:  # Check if we are running out of space on the page
+                c.showPage()  # Create a new page
+                y = height - margin_y  # Reset y position
+            c.drawString(margin_x, y, line)
+            y -= line_height
+        return y
+
+    # Draw profile name
+    y = draw_wrapped_text(f"Profile Name: {profile['name']}", y, c, max_text_width)
+
+    # Draw contacts
+    if profile.get('contacts'):
+        y = draw_wrapped_text("Contacts:", y - 20, c, max_text_width)
+        for contact in profile['contacts']:
+            # Separate name, phone, and email on different lines
+            y = draw_wrapped_text(f"Name: {contact['name']}", y - 10, c, max_text_width)
+            y = draw_wrapped_text(f"Phone: {contact.get('phone', 'N/A')}", y - 5, c, max_text_width)
+            y = draw_wrapped_text(f"Email: {contact.get('email', 'N/A')}", y - 5, c, max_text_width)
+            y -= 10  # Add extra spacing between different contacts
+    else:
+        y = draw_wrapped_text("Contacts: None", y - 20, c, max_text_width)
+
+    if profile.get('contact2s2'):
+        y = draw_wrapped_text("Contact2s2:", y - 20, c, max_text_width)
+        for contact in profile['contact2s2']:
+            # Separate name, phone, and email on different lines
+            y = draw_wrapped_text(f"Name: {contact['name']}", y - 10, c, max_text_width)
+            y = draw_wrapped_text(f"Phone: {contact.get('phone', 'N/A')}", y - 5, c, max_text_width)
+            y = draw_wrapped_text(f"Email: {contact.get('email', 'N/A')}", y - 5, c, max_text_width)
+            y -= 10  # Add extra spacing between different contacts
+    else:
+        y = draw_wrapped_text("Contacts: None", y - 20, c, max_text_width)
+    
+    if profile.get('contact3s3'):
+        y = draw_wrapped_text("Contact3s3:", y - 20, c, max_text_width)
+        for contact in profile['contact3s3']:
+            # Separate name, phone, and email on different lines
+            y = draw_wrapped_text(f"Name: {contact['name']}", y - 10, c, max_text_width)
+            y = draw_wrapped_text(f"Phone: {contact.get('phone', 'N/A')}", y - 5, c, max_text_width)
+            y = draw_wrapped_text(f"Email: {contact.get('email', 'N/A')}", y - 5, c, max_text_width)
+            y -= 10  # Add extra spacing between different contacts
+    else:
+        y = draw_wrapped_text("Contacts: None", y - 20, c, max_text_width)
+
+    # Draw vehicles section
+    vehicles_text = "Vehicles: Yes" if profile.get('vehicles') else "Vehicles: No"
+    y = draw_wrapped_text(vehicles_text, y - 20, c, max_text_width)
+
+    # Draw housing section
+    housing_text = "Housing: Yes" if profile.get('housing') else "Housing: No"
+    y = draw_wrapped_text(housing_text, y - 20, c, max_text_width)
+
+    # Draw housing2 section
+    housing2_text = "Housing2: Yes" if profile.get('housing2') else "Housing2: No"
+    y = draw_wrapped_text(housing2_text, y - 20, c, max_text_width)
+
+    # Save and close the PDF
+    c.save()
+    messagebox.showinfo("PDF Generated", f"PDF file '{pdf_file}' has been generated.")
+
+
+# Main window function
+
+
+
+
+# Create the main Tkinter window
+root = tk.Tk()
+root.title("Profile Manager")
+
+    # Create a canvas for scrolling
+canvas = tk.Canvas(root, borderwidth=0)
+canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    # Create a scrollbar for the canvas
+scrollbar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    # Configure the canvas to work with the scrollbar
+canvas.configure(yscrollcommand=scrollbar.set)
+
+    # Create a frame inside the canvas to hold the main content
+content_frame = tk.Frame(canvas)
+canvas.create_window((0, 0), window=content_frame, anchor="nw")
+
+    # Function to update the canvas scroll region
+def update_scroll_region(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+content_frame.bind("<Configure>", update_scroll_region)
+
+# Define buttons and labels for each section
+def create_button_with_label(frame, text, command):
+    btn_frame = tk.Frame(frame)
+    btn_frame.pack(fill=tk.X, pady=5)
+
+    button = tk.Button(btn_frame, text=text, command=command)
+    button.pack(side=tk.LEFT)
+
+    label = tk.Label(btn_frame, text="Incomplete")
+    label.pack(side=tk.LEFT, padx=10)
+
+    return label
+
+
+
+profiles_listbox = tk.Listbox(root)
+profiles_listbox.pack(side=tk.LEFT, padx=20, pady=20)
+
+# Frame to hold the buttons and labels
+button_frame = tk.Frame(root)
+button_frame.pack(side=tk.LEFT, padx=20, pady=20)
+
+def create_button_with_label(frame, text, command):
+    btn_frame = tk.Frame(frame)
+    btn_frame.pack(fill=tk.X, pady=5)
+
+    button = tk.Button(btn_frame, text=text, command=command)
+    button.pack(side=tk.LEFT)
+
+    label = tk.Label(btn_frame, text="Incomplete")
+    label.pack(side=tk.LEFT, padx=10)
+
+    return label
+
+# Buttons and Labels for each section
+tk.Button(root, text="Create Profile", command=lambda: create_profile_window()).pack(pady=5)
+banking_info_label = create_button_with_label(button_frame, "Banking Info", lambda: open_banking_info_window(profiles_listbox.get(tk.ACTIVE)))
+credit_debts_label = create_button_with_label(button_frame, "Credit Debts", lambda: open_credit_debts_window(profiles_listbox.get(tk.ACTIVE)))
+contacts_label = create_button_with_label(button_frame, "Contacts", lambda: open_contacts_window(profiles_listbox.get(tk.ACTIVE)))
+contacts_label2 = create_button_with_label(button_frame, "Contacts2", lambda: open_contact2s2_window(profiles_listbox.get(tk.ACTIVE)))
+tk.Button(root, text="Generate PDF", command=generate_pdf).pack(pady=10)
+tk.Button(root, text="Delete pROFILE", command=delete_profile).pack(pady=10)
+documents_label = create_button_with_label(button_frame, "Documents", lambda: open_documents_window(profiles_listbox.get(tk.ACTIVE)))
+housing_label = create_button_with_label(button_frame, "Housing Info", lambda: open_housing_info_window(profiles_listbox.get(tk.ACTIVE)))
+housing_label2 = create_button_with_label(button_frame, "Housing2 Info", lambda: open_housing_info2_window(profiles_listbox.get(tk.ACTIVE)))
+
+def on_profile_select(event):
+    selected_index = profiles_listbox.curselection()
+    if selected_index:
+        selected_profile = profiles[selected_index[0]]
+        update_labels(selected_profile)
+
+# Bind the selection event
+profiles_listbox.bind("<<ListboxSelect>>", on_profile_select)
+# Populate profiles listbox on startup
+for profile in profiles:
+    profiles_listbox.insert(tk.END, profile['name'])
+
+# Start the main Tkinter event loop
+root.mainloop()
