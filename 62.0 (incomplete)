@@ -1,0 +1,468 @@
+import tkinter as tk
+from tkinter import messagebox
+import json
+import os
+
+PROFILES_FILE = "profiles.json"
+
+import tkinter as tk
+from tkinter import messagebox
+import json
+import os
+# Function to save profiles to JSON file
+def save_profiles(profiles):
+    with open(PROFILES_FILE, "w") as file:
+        json.dump(profiles, file, indent=4)
+# Function to save selected next steps to the profiles.json file
+def save_selected_next_steps(selected_steps, profile_name):
+    if selected_steps:
+        # Load profiles data
+        profiles_data = load_profiles()
+
+        # Ensure profile exists
+        profile = next((p for p in profiles_data if p['name'] == profile_name), None)
+        if profile:
+            # Save next steps under the profile
+            profile["next_steps"] = selected_steps
+
+            # Write back to the profiles file
+            save_profiles(profiles_data)
+
+            messagebox.showinfo("Steps Saved", f"Your selections have been saved for {profile_name}.")
+        else:
+            messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' does not exist.")
+    else:
+        messagebox.showwarning("Selection Error", "Please select at least one next step.")
+
+# Open Next Steps window
+def open_next_steps_window(profile_name):
+    steps_window = tk.Toplevel()
+    steps_window.title(f"Manage Next Steps for {profile_name}")
+
+    tk.Label(steps_window, text="Next Steps (Yes or No):", font=("Arial", 14)).pack(pady=10)
+
+    # List of next steps
+    steps = [
+        "Locate Will or Other Estate Planning Documents",
+        "Will and Trust (See Section 17)",
+        "Contact Organizations and Service Providers",
+        "Insurance (See Section 18)",
+        "Bank and Brokerage Accounts (See Section 19)",
+        "Retirement Plans and Pensions (See Section 20)",
+        "Government Benefits (See Section 21)",
+        "Service Providers (See Section 10)",
+        "Other: Add custom step 1",
+        "Other: Add custom step 2",
+        "Other: Add custom step 3",
+        "Other: Add custom step 4"
+    ]
+
+    # Dictionary to store selected steps
+    profiles_data = load_profiles()
+    profile = next((p for p in profiles_data if p['name'] == profile_name), None)
+    selected_steps = profile.get("next_steps", {}) if profile else {}
+
+    # Create radio buttons for each step with "Yes" and "No" options
+    step_vars = {}
+    for step in steps:
+        step_frame = tk.Frame(steps_window)
+        step_frame.pack(anchor=tk.W, pady=5)
+
+        # Step label
+        tk.Label(step_frame, text=step, font=("Arial", 12)).pack(side=tk.LEFT)
+
+        # Variables to store "Yes" or "No" selection
+        step_vars[step] = tk.StringVar(value=selected_steps.get(step, ""))
+
+        # Yes and No radio buttons
+        yes_rb = tk.Radiobutton(step_frame, text="Yes", variable=step_vars[step], value="Yes")
+        no_rb = tk.Radiobutton(step_frame, text="No", variable=step_vars[step], value="No")
+
+        yes_rb.pack(side=tk.LEFT, padx=5)
+        no_rb.pack(side=tk.LEFT, padx=5)
+
+    # Save button
+    def save_steps():
+        # Collect selected steps
+        final_selections = {step: var.get() for step, var in step_vars.items()}
+        save_selected_next_steps(final_selections, profile_name)
+
+    tk.Button(steps_window, text="Save", command=save_steps).pack(pady=10)
+
+
+# Function to load profiles from JSON file
+def load_profiles():
+    if os.path.exists(PROFILES_FILE):
+        with open(PROFILES_FILE, "r") as file:
+            return json.load(file)
+    return []
+
+# Function to save profiles to JSON file
+def save_to_json(profiles, filename):
+    with open(filename, "w") as file:
+        json.dump(profiles, file, indent=4)
+
+# Initialize profiles
+profiles = load_profiles()
+def load_profiles():
+    global profiles
+    try:
+        with open("profiles.json", "r") as file:
+            profiles = json.load(file)
+    except FileNotFoundError:
+        profiles = []
+    except json.JSONDecodeError:
+        profiles = []
+
+# Save profiles to a file
+def save_profiles():
+    with open("profiles.json", "w") as file:
+        json.dump(profiles, file)
+
+
+def save_selected_next_steps(selected_steps, profile_name):
+    if selected_steps:
+        # Load profiles data
+        profiles_data = load_profiles()
+
+        # Ensure profile exists
+        profile = next((p for p in profiles_data if p['name'] == profile_name), None)
+        if profile:
+            # Save next steps under the profile
+            profile["next_steps"] = selected_steps
+
+            # Write back to the profiles file
+            save_profiles(profiles_data)
+
+            messagebox.showinfo("Steps Saved", f"Your selections have been saved for {profile_name}.")
+        else:
+            messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' does not exist.")
+    else:
+        messagebox.showwarning("Selection Error", "Please select at least one next step.")
+
+# Open Next Steps window
+def open_next_steps_window(profile_name):
+    steps_window = tk.Toplevel()
+    steps_window.title(f"Manage Next Steps for {profile_name}")
+
+    tk.Label(steps_window, text="Next Steps (Yes or No):", font=("Arial", 14)).pack(pady=10)
+
+    # List of next steps
+    steps = [
+        "Locate Will or Other Estate Planning Documents",
+        "Will and Trust (See Section 17)",
+        "Contact Organizations and Service Providers",
+        "Insurance (See Section 18)",
+        "Bank and Brokerage Accounts (See Section 19)",
+        "Retirement Plans and Pensions (See Section 20)",
+        "Government Benefits (See Section 21)",
+        "Service Providers (See Section 10)",
+        "Other: Add custom step 1",
+        "Other: Add custom step 2",
+        "Other: Add custom step 3",
+        "Other: Add custom step 4"
+    ]
+
+    # Dictionary to store selected steps
+    profiles_data = load_profiles()
+    profile = next((p for p in profiles_data if p['name'] == profile_name), None)
+    selected_steps = profile.get("next_steps", {}) if profile else {}
+
+    # Create radio buttons for each step with "Yes" and "No" options
+    step_vars = {}
+    for step in steps:
+        step_frame = tk.Frame(steps_window)
+        step_frame.pack(anchor=tk.W, pady=5)
+
+        # Step label
+        tk.Label(step_frame, text=step, font=("Arial", 12)).pack(side=tk.LEFT)
+
+        # Variables to store "Yes" or "No" selection
+        step_vars[step] = tk.StringVar(value=selected_steps.get(step, ""))
+
+        # Yes and No radio buttons
+        yes_rb = tk.Radiobutton(step_frame, text="Yes", variable=step_vars[step], value="Yes")
+        no_rb = tk.Radiobutton(step_frame, text="No", variable=step_vars[step], value="No")
+
+        yes_rb.pack(side=tk.LEFT, padx=5)
+        no_rb.pack(side=tk.LEFT, padx=5)
+
+    # Save button
+    def save_steps():
+        # Collect selected steps
+        final_selections = {step: var.get() for step, var in step_vars.items()}
+        save_selected_next_steps(final_selections, profile_name)
+
+    tk.Button(steps_window, text="Save", command=save_steps).pack(pady=10)
+
+# Function to open the profile window
+def open_profile_window(profile_name):
+    profile_window = tk.Toplevel()
+    profile_window.title(f"Profile: {profile_name}")
+
+    # Make the window maximized (instead of full screen)
+    profile_window.state('zoomed')
+
+    tk.Label(profile_window, text=f"Manage {profile_name}'s Information", font=("Arial", 14)).grid(row=0, column=0, columnspan=2, pady=10)
+
+    # Find the selected profile data
+    profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+
+    if profile_data:
+        # Define functions to update the status labels dynamically
+        def update_contact_status():
+            contact_status = "Complete" if profile_data.get('contacts', []) else "Incomplete"
+            contact_status_label.config(text=contact_status)
+
+        def update_real_estate_status():
+            real_estate_status = "Complete" if profile_data.get('real_estate', []) else "Incomplete"
+            real_estate_status_label.config(text=real_estate_status)
+
+        def update_vehicle_status():
+            vehicle_status = "Complete" if profile_data.get('vehicles', []) else "Incomplete"
+            vehicle_status_label.config(text=vehicle_status)
+
+        # Manage Contacts
+        contact_status = "Complete" if profile_data.get('contacts', []) else "Incomplete"
+        tk.Button(profile_window, text="Manage Contacts", command=lambda: open_contacts_window(profile_name, update_contact_status)).grid(row=1, column=0, pady=5, padx=10)
+        contact_status_label = tk.Label(profile_window, text=contact_status)
+        contact_status_label.grid(row=1, column=1)
+
+        # Manage Real Estate
+        real_estate_status = "Complete" if profile_data.get('real_estate', []) else "Incomplete"
+        tk.Button(profile_window, text="Manage Real Estate", command=lambda: open_real_estate_window(profile_name, update_real_estate_status)).grid(row=2, column=0, pady=5, padx=10)
+        real_estate_status_label = tk.Label(profile_window, text=real_estate_status)
+        real_estate_status_label.grid(row=2, column=1)
+
+        # Manage Vehicles
+        vehicle_status = "Complete" if profile_data.get('vehicles', []) else "Incomplete"
+        tk.Button(profile_window, text="Manage Vehicles", command=lambda: open_vehicles_window(profile_name, update_vehicle_status)).grid(row=3, column=0, pady=5, padx=10)
+        vehicle_status_label = tk.Label(profile_window, text=vehicle_status)
+        vehicle_status_label.grid(row=3, column=1)
+
+        tk.Button(profile_window, text="Manage Next Steps", command=lambda: open_next_steps_window(profile_name)).grid(row=1, column=0, pady=5, padx=10)
+
+    # Add an "Exit" button to close the profile window
+    tk.Button(profile_window, text="Exit", command=profile_window.destroy).grid(row=4, column=0, pady=5, padx=10)
+
+# Function to handle double-click on a profile in the listbox
+def on_profile_double_click(event):
+    selected_index = profiles_listbox.curselection()
+    if selected_index:
+        selected_profile_name = profiles_listbox.get(selected_index[0])
+        open_profile_window(selected_profile_name)
+
+# Open important tasks window
+
+# Function to handle double-click on a profile in the listbox
+def on_profile_double_click(event):
+    selected_index = profiles_listbox.curselection()
+    if selected_index:
+        selected_profile_name = profiles_listbox.get(selected_index[0])
+        open_profile_window(selected_profile_name)
+
+# Open contacts window
+def open_contacts_window(profile_name, update_status_callback):
+    contacts_window = tk.Toplevel()
+    contacts_window.title(f"Manage Contacts for {profile_name}")
+
+    tk.Label(contacts_window, text="Phone Number:").pack(pady=5)
+    phone_entry = tk.Entry(contacts_window)
+    phone_entry.pack(pady=5)
+
+    tk.Label(contacts_window, text="Email Address:").pack(pady=5)
+    email_entry = tk.Entry(contacts_window)
+    email_entry.pack(pady=5)
+
+    contacts_listbox = tk.Listbox(contacts_window, height=10, width=50)
+    contacts_listbox.pack(pady=10)
+
+    def refresh_contacts():
+        contacts_listbox.delete(0, tk.END)
+        profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+        if profile_data:
+            for contact in profile_data.get('contacts', []):
+                contacts_listbox.insert(tk.END, f"{contact['name']} | {contact['phone']} | {contact['email']}")
+
+    def save_contact():
+        contact_name = phone_entry.get()
+        phone_number = phone_entry.get()
+        email_address = email_entry.get()
+        if contact_name and phone_number and email_address:
+            profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+            if profile_data:
+                if 'contacts' not in profile_data:
+                    profile_data['contacts'] = []
+                profile_data['contacts'].append({"name": contact_name, "phone": phone_number, "email": email_address})
+                phone_entry.delete(0, tk.END)
+                email_entry.delete(0, tk.END)
+                update_status_callback()  # Update the contact status label
+                refresh_contacts()  # Refresh the contact list display
+                save_profiles()  # Save profiles to file
+        else:
+            messagebox.showwarning("Input Error", "Please fill all fields.")
+
+    tk.Button(contacts_window, text="Save Contact", command=save_contact).pack(pady=5)
+    refresh_contacts()  # Initial population of the contact list
+
+# Open real estate window
+def open_real_estate_window(profile_name, update_status_callback):
+    real_estate_window = tk.Toplevel()
+    real_estate_window.title(f"Manage Real Estate for {profile_name}")
+
+    tk.Label(real_estate_window, text="Property Address:").pack(pady=5)
+    address_entry = tk.Entry(real_estate_window)
+    address_entry.pack(pady=5)
+
+    tk.Label(real_estate_window, text="Property Value:").pack(pady=5)
+    value_entry = tk.Entry(real_estate_window)
+    value_entry.pack(pady=5)
+
+    properties_listbox = tk.Listbox(real_estate_window, height=10, width=50)
+    properties_listbox.pack(pady=10)
+
+    def refresh_properties():
+        properties_listbox.delete(0, tk.END)
+        profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+        if profile_data:
+            for property_data in profile_data.get('real_estate', []):
+                properties_listbox.insert(tk.END, f"{property_data['address']} | ${property_data['value']}")
+
+    def save_property():
+        property_address = address_entry.get()
+        property_value = value_entry.get()
+        if property_address and property_value:
+            profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+            if profile_data:
+                if 'real_estate' not in profile_data:
+                    profile_data['real_estate'] = []
+                profile_data['real_estate'].append({"address": property_address, "value": property_value})
+                address_entry.delete(0, tk.END)
+                value_entry.delete(0, tk.END)
+                update_status_callback()  # Update the real estate status label
+                refresh_properties()  # Refresh the property list display
+                save_profiles()  # Save profiles to file
+        else:
+            messagebox.showwarning("Input Error", "Please fill all fields.")
+
+    tk.Button(real_estate_window, text="Save Property", command=save_property).pack(pady=5)
+    refresh_properties()  # Initial population of the property list
+
+# Open vehicles window
+def open_vehicles_window(profile_name, update_status_callback):
+    vehicles_window = tk.Toplevel()
+    vehicles_window.title(f"Manage Vehicles for {profile_name}")
+
+    tk.Label(vehicles_window, text="Vehicle Make:").pack(pady=5)
+    make_entry = tk.Entry(vehicles_window)
+    make_entry.pack(pady=5)
+
+    tk.Label(vehicles_window, text="Vehicle Model:").pack(pady=5)
+    model_entry = tk.Entry(vehicles_window)
+    model_entry.pack(pady=5)
+
+    vehicles_listbox = tk.Listbox(vehicles_window, height=10, width=50)
+    vehicles_listbox.pack(pady=10)
+
+    def refresh_vehicles():
+        vehicles_listbox.delete(0, tk.END)
+        profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+        if profile_data:
+            for vehicle in profile_data.get('vehicles', []):
+                vehicles_listbox.insert(tk.END, f"{vehicle['make']} | {vehicle['model']}")
+
+    def save_vehicle():
+        vehicle_make = make_entry.get()
+        vehicle_model = model_entry.get()
+        if vehicle_make and vehicle_model:
+            profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+            if profile_data:
+                if 'vehicles' not in profile_data:
+                    profile_data['vehicles'] = []
+                profile_data['vehicles'].append({"make": vehicle_make, "model": vehicle_model})
+                make_entry.delete(0, tk.END)
+                model_entry.delete(0, tk.END)
+                update_status_callback()  # Update the vehicle status label
+                refresh_vehicles()  # Refresh the vehicle list display
+                save_profiles()  # Save profiles to file
+        else:
+            messagebox.showwarning("Input Error", "Please fill all fields.")
+
+    tk.Button(vehicles_window, text="Save Vehicle", command=save_vehicle).pack(pady=5)
+    refresh_vehicles()  # Initial population of the vehicle list
+
+
+import tkinter as tk
+from tkinter import filedialog
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
+def generate_pdf(profile_data):
+    # Ask user where to save the PDF file
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".pdf",
+        filetypes=[("PDF files", "*.pdf")],
+        title="Save PDF As"
+    )
+    
+    # If the user cancels the dialog, return without doing anything
+    if not file_path:
+        return
+
+    # Create the PDF file at the selected location
+    c = canvas.Canvas(file_path, pagesize=letter)
+    width, height = letter
+    
+    y_position = height - 50  # Start at the top of the page
+    
+    # Title
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, y_position, f"Profile Information for {profile_data['name']}")
+    y_position -= 40
+    
+    # Example of adding sections (you can add more fields here)
+    c.setFont("Helvetica", 12)
+    c.drawString(100, y_position, f"Address: {profile_data.get('address', 'Not available')}")
+    y_position -= 20
+    c.drawString(100, y_position, f"Phone: {profile_data.get('phone', 'Not available')}")
+    y_position -= 20
+
+    # Add Vehicle Information
+    if 'vehicles' in profile_data:
+        y_position -= 20  # Add space before vehicle section
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(100, y_position, "Vehicles:")
+        y_position -= 20
+        c.setFont("Helvetica", 12)
+        
+        for vehicle in profile_data.get('vehicles', []):
+            make = vehicle.get('make', 'Unknown')
+            model = vehicle.get('model', 'Unknown')
+            c.drawString(100, y_position, f"Make: {make}, Model: {model}")
+            y_position -= 20  # Adjust position for the next vehicle
+
+    # Save the PDF
+    c.save()
+
+    # Notify the user that the PDF has been saved
+    print(f"PDF saved at {file_path}")
+# Main window setup
+root = tk.Tk()
+root.title("Profile Management")
+load_profiles()
+
+# Listbox to display profiles
+profiles_listbox = tk.Listbox(root, height=10, width=50)
+profiles_listbox.pack(pady=10)
+
+# Add profiles to the listbox
+for profile in profiles:
+    profiles_listbox.insert(tk.END, profile['name'])
+
+profiles_listbox.bind("<Double-Button-1>", on_profile_double_click)
+
+# Add an "Exit" button
+tk.Button(root, text="Create Profile", command=lambda: create_profile_window()).pack(pady=10)
+tk.Button(root, text="Exit", command=root.quit).pack(pady=10)
+
+root.mainloop()
