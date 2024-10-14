@@ -1,0 +1,668 @@
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import tkinter as tk
+from tkinter import messagebox
+import json
+import os
+PROFILES_FILE = "profiles.json"
+
+# Function to load profiles from JSON file
+def load_profiles():
+    if os.path.exists(PROFILES_FILE):
+        with open(PROFILES_FILE, "r") as file:
+            return json.load(file)
+    return []
+
+# Function to save profiles to JSON file
+def save_profiles(profiles):
+    with open(PROFILES_FILE, "w") as file:
+        json.dump(profiles, file, indent=4)
+
+# Load profiles initially
+profiles = load_profiles()
+
+# Function to save selected next steps to the profiles.json file
+def save_selected_next_steps(selected_steps, profile_name):
+    if selected_steps:
+        profiles_data = load_profiles()
+        profile = next((p for p in profiles_data if p['name'] == profile_name), None)
+        if profile:
+            profile["next_steps"] = selected_steps
+            save_profiles(profiles_data)
+            messagebox.showinfo("Steps Saved", f"Your selections have been saved for {profile_name}.")
+        else:
+            messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' does not exist.")
+    else:
+        messagebox.showwarning("Selection Error", "Please select at least one next step.")
+
+# Function to open the Next Steps window
+def save_selected_next_steps(selected_steps, profile_name):
+    if selected_steps:
+        # Load profiles data
+        profiles_data = load_profiles()
+
+        # Ensure profile exists
+        profile = next((p for p in profiles_data if p['name'] == profile_name), None)
+        if profile:
+            # Save next steps under the profile
+            profile["next_steps"] = selected_steps
+
+            # Write back to the profiles file
+            save_profiles(profiles_data)
+
+            messagebox.showinfo("Steps Saved", f"Your selections have been saved for {profile_name}.")
+        else:
+            messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' does not exist.")
+    else:
+        messagebox.showwarning("Selection Error", "Please select at least one next step.")
+
+# Open Next Steps window
+def open_next_steps_window(profile_name):
+    steps_window = tk.Toplevel()
+    steps_window.title(f"Manage Next Steps for {profile_name}")
+
+    tk.Label(steps_window, text="Next Steps (Yes or No):", font=("Arial", 14)).pack(pady=10)
+
+    # List of next steps
+    steps = [
+        "Locate Will or Other Estate Planning Documents",
+        "Will and Trust (See Section 17)",
+        "Contact Organizations and Service Providers",
+        "Insurance (See Section 18)",
+        "Bank and Brokerage Accounts (See Section 19)",
+        "Retirement Plans and Pensions (See Section 20)",
+        "Government Benefits (See Section 21)",
+        "Service Providers (See Section 10)",
+        "Other: Add custom step 1",
+        "Other: Add custom step 2",
+        "Other: Add custom step 3",
+        "Other: Add custom step 4"
+    ]
+
+    # Dictionary to store selected steps
+    profiles_data = load_profiles()
+    profile = next((p for p in profiles_data if p['name'] == profile_name), None)
+    selected_steps = profile.get("next_steps", {}) if profile else {}
+
+    # Create radio buttons for each step with "Yes" and "No" options
+    step_vars = {}
+    for step in steps:
+        step_frame = tk.Frame(steps_window)
+        step_frame.pack(anchor=tk.W, pady=5)
+
+        # Step label
+        tk.Label(step_frame, text=step, font=("Arial", 12)).pack(side=tk.LEFT)
+
+        # Variables to store "Yes" or "No" selection
+        step_vars[step] = tk.StringVar(value=selected_steps.get(step, ""))
+
+        # Yes and No radio buttons
+        yes_rb = tk.Radiobutton(step_frame, text="Yes", variable=step_vars[step], value="Yes")
+        no_rb = tk.Radiobutton(step_frame, text="No", variable=step_vars[step], value="No")
+
+        yes_rb.pack(side=tk.LEFT, padx=5)
+        no_rb.pack(side=tk.LEFT, padx=5)
+
+    # Save button
+    def save_steps():
+        # Collect selected steps
+        final_selections = {step: var.get() for step, var in step_vars.items()}
+        save_selected_next_steps(final_selections, profile_name)
+
+    tk.Button(steps_window, text="Save", command=save_steps).pack(pady=10)
+
+# Function to open the Vehicles window
+def open_vehicles_window(profile_name, update_status_callback):
+    vehicles_window = tk.Toplevel()
+    vehicles_window.title(f"Manage vehicles for {profile_name}")
+
+    tk.Label(vehicles_window, text="Vehicle Brand:").pack(pady=5)
+    name_entry = tk.Entry(vehicles_window)
+    name_entry.pack(pady=5)
+    name_entry.focus_set()  # Set focus to the vehicle name entry field
+
+    tk.Label(vehicles_window, text="Vehicle Model:").pack(pady=5)
+    model_entry = tk.Entry(vehicles_window)
+    model_entry.pack(pady=5)
+
+    tk.Label(vehicles_window, text="Vehicle Color:").pack(pady=5)
+    color_entry = tk.Entry(vehicles_window)
+    color_entry.pack(pady=5)
+
+    tk.Label(vehicles_window, text="Vehicle Address:").pack(pady=5)
+    address_entry = tk.Entry(vehicles_window)
+    address_entry.pack(pady=5)
+
+    tk.Label(vehicles_window, text="Ownership Status:").pack(pady=5)
+    relation_var = tk.StringVar(value="Friend")  # Default relation
+
+    # Relation radio buttons
+    relation_frame = tk.Frame(vehicles_window)
+    relation_frame.pack(pady=5)
+    tk.Radiobutton(relation_frame, text="Owner", variable=relation_var, value="Owner").pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(relation_frame, text="This is a Rental Car", variable=relation_var, value="This is a Rental Car").pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(relation_frame, text="Other", variable=relation_var, value="Other").pack(side=tk.LEFT, padx=5)
+
+    # vehicles list display
+    vehicles_listbox = tk.Listbox(vehicles_window, height=10, width=50)
+    vehicles_listbox.pack(pady=10)
+
+    def refresh_vehicles():
+        vehicles_listbox.delete(0, tk.END)
+        profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+        if profile_data:
+            for vehicle in profile_data.get('vehicles', []):
+                vehicle_details = f"{vehicle['name']} | {vehicle['model']} | {vehicle['color']} | {vehicle['address']}| {vehicle['relation']}"
+                vehicles_listbox.insert(tk.END, vehicle_details)
+
+    def save_vehicle():
+        vehicle_name = name_entry.get()
+        model_number = model_entry.get()
+        color_address = color_entry.get()
+        address = address_entry.get()
+        relation = relation_var.get()
+
+        if vehicle_name and model_number and color_address and address and relation:
+            profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+            if profile_data:
+                if 'vehicles' not in profile_data:
+                    profile_data['vehicles'] = []
+                profile_data['vehicles'].append({
+                    "name": vehicle_name,
+                    "model": model_number,
+                    "color": color_address,
+                    "address": address,
+                    "relation": relation
+                })
+                # Clear the entry fields after saving
+                name_entry.delete(0, tk.END)
+                model_entry.delete(0, tk.END)
+                color_entry.delete(0, tk.END)
+                address_entry.delete(0, tk.END)
+                
+                update_status_callback()  # Update the vehicle status label
+                refresh_vehicles()  # Refresh the vehicle list display
+                save_profiles(profiles)  # Save profiles to file
+        else:
+            messagebox.showwarning("Input Error", "Please fill all fields.")
+
+    tk.Button(vehicles_window, text="Save vehicle", command=save_vehicle).pack(pady=5)
+    refresh_vehicles()  # Initial population of the vehicle list
+
+# Function to open the Contacts window
+def open_contacts_window(profile_name, update_status_callback):
+    contacts_window = tk.Toplevel()
+    contacts_window.title(f"Manage Contacts for {profile_name}")
+
+    # Create a canvas and scrollbar for the form
+    canvas = tk.Canvas(contacts_window)
+    scrollbar = tk.Scrollbar(contacts_window, orient="vertical", command=canvas.yview)
+    scrollable_frame = tk.Frame(canvas)
+
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    # Pack the canvas and scrollbar
+    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    tk.Label(contacts_window, text="Contact Name:").pack(pady=5)
+    name_entry = tk.Entry(contacts_window)
+    name_entry.pack(pady=5)
+    name_entry.focus_set()  # Set focus to the Contact Name entry field
+
+    tk.Label(contacts_window, text="Phone Number:").pack(pady=5)
+    phone_entry = tk.Entry(contacts_window)
+    phone_entry.pack(pady=5)
+
+    tk.Label(contacts_window, text="Email Address:").pack(pady=5)
+    email_entry = tk.Entry(contacts_window)
+    email_entry.pack(pady=5)
+
+    tk.Label(contacts_window, text="Address:").pack(pady=5)
+    address_entry = tk.Entry(contacts_window)
+    address_entry.pack(pady=5)
+
+    tk.Label(contacts_window, text="Relation:").pack(pady=5)
+    relation_var = tk.StringVar(value="Friend")  # Default relation
+
+    # Relation radio buttons
+    relation_frame = tk.Frame(contacts_window)
+    relation_frame.pack(pady=5)
+    tk.Radiobutton(relation_frame, text="Friend", variable=relation_var, value="Friend").pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(relation_frame, text="Acquaintance", variable=relation_var, value="Acquaintance").pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(relation_frame, text="Other", variable=relation_var, value="Other").pack(side=tk.LEFT, padx=5)
+
+    # Contacts list display
+    contacts_listbox = tk.Listbox(contacts_window, height=10, width=50)
+    contacts_listbox.pack(pady=10)
+
+    def refresh_contacts():
+        contacts_listbox.delete(0, tk.END)
+        profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+        if profile_data:
+            for contact in profile_data.get('contacts', []):
+                contact_details = f"{contact['name']} | {contact['phone']} | {contact['email']} | {contact['address']} | {contact['relation']}"
+                contacts_listbox.insert(tk.END, contact_details)
+
+    def save_contact():
+        contact_name = name_entry.get()
+        phone_number = phone_entry.get()
+        email_address = email_entry.get()
+        address = address_entry.get()
+        relation = relation_var.get()
+
+        if contact_name and phone_number and email_address and address and relation:
+            profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+            if profile_data:
+                if 'contacts' not in profile_data:
+                    profile_data['contacts'] = []
+                profile_data['contacts'].append({
+                    "name": contact_name,
+                    "phone": phone_number,
+                    "email": email_address,
+                    "address": address,
+                    "relation": relation
+                })
+                # Clear the entry fields after saving
+                name_entry.delete(0, tk.END)
+                phone_entry.delete(0, tk.END)
+                email_entry.delete(0, tk.END)
+                address_entry.delete(0, tk.END)
+                
+                update_status_callback()  # Update the contact status label
+                refresh_contacts()  # Refresh the contact list display
+                save_profiles(profiles)  # Save profiles to file
+        else:
+            messagebox.showwarning("Input Error", "Please fill all fields.")
+
+    tk.Button(contacts_window, text="Save Contact", command=save_contact).pack(pady=5)
+    refresh_contacts()  # Initial population of the contact list
+
+
+def open_biographies_window(profile_name, update_status_callback):
+    biographies_window = tk.Toplevel()
+    biographies_window.title(f"Manage biographies for {profile_name}")
+
+    tk.Label(biographies_window, text="biography Name:").pack(pady=5)
+    name_entry = tk.Entry(biographies_window)
+    name_entry.pack(pady=5)
+    name_entry.focus_set()  # Set focus to the biography Name entry field
+
+    tk.Label(biographies_window, text="Phone Number:").pack(pady=5)
+    phone_entry = tk.Entry(biographies_window)
+    phone_entry.pack(pady=5)
+
+    tk.Label(biographies_window, text="Email Address:").pack(pady=5)
+    email_entry = tk.Entry(biographies_window)
+    email_entry.pack(pady=5)
+
+    tk.Label(biographies_window, text="Address:").pack(pady=5)
+    address_entry = tk.Entry(biographies_window)
+    address_entry.pack(pady=5)
+
+    tk.Label(biographies_window, text="Relation:").pack(pady=5)
+    relation_var = tk.StringVar(value="Friend")  # Default relation
+
+    # Relation radio buttons
+    relation_frame = tk.Frame(biographies_window)
+    relation_frame.pack(pady=5)
+    tk.Radiobutton(relation_frame, text="Friend", variable=relation_var, value="Friend").pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(relation_frame, text="Acquaintance", variable=relation_var, value="Acquaintance").pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(relation_frame, text="Other", variable=relation_var, value="Other").pack(side=tk.LEFT, padx=5)
+
+    # biographies list display
+    biographies_listbox = tk.Listbox(biographies_window, height=10, width=50)
+    biographies_listbox.pack(pady=10)
+
+    def refresh_biographies():
+        biographies_listbox.delete(0, tk.END)
+        profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+        if profile_data:
+            for biography in profile_data.get('biographies', []):
+                biography_details = f"{biography['name']} | {biography['phone']} | {biography['email']} | {biography['address']} | {biography['relation']}"
+                biographies_listbox.insert(tk.END, biography_details)
+
+    def save_biography():
+        biography_name = name_entry.get()
+        phone_number = phone_entry.get()
+        email_address = email_entry.get()
+        address = address_entry.get()
+        relation = relation_var.get()
+
+        if biography_name and phone_number and email_address and address and relation:
+            profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+            if profile_data:
+                if 'biographies' not in profile_data:
+                    profile_data['biographies'] = []
+                profile_data['biographies'].append({
+                    "name": biography_name,
+                    "phone": phone_number,
+                    "email": email_address,
+                    "address": address,
+                    "relation": relation
+                })
+                # Clear the entry fields after saving
+                name_entry.delete(0, tk.END)
+                phone_entry.delete(0, tk.END)
+                email_entry.delete(0, tk.END)
+                address_entry.delete(0, tk.END)
+                
+                update_status_callback()  # Update the biography status label
+                refresh_biographies()  # Refresh the biography list display
+                save_profiles(profiles)  # Save profiles to file
+        else:
+            messagebox.showwarning("Input Error", "Please fill all fields.")
+
+    tk.Button(biographies_window, text="Save biography", command=save_biography).pack(pady=5)
+    refresh_biographies()  # Initial population of the biography list
+# Function to generate a PDF for a given profile
+import os
+from tkinter import filedialog
+
+# Function to generate a PDF for a given profile
+def generate_profile_pdf(profile_name):
+    profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+    if not profile_data:
+        messagebox.showwarning("Profile Not Found", f"Profile '{profile_name}' does not exist.")
+        return
+
+    # Ask the user to select a folder to save the PDF
+    folder_path = filedialog.askdirectory(title="Select Folder to Save PDF")
+    if not folder_path:
+        messagebox.showwarning("No Folder Selected", "Please select a folder to save the PDF.")
+        return
+
+    # Construct the full path for the PDF file
+    pdf_filename = os.path.join(folder_path, f"{profile_name}_profile.pdf")
+    c = canvas.Canvas(pdf_filename, pagesize=letter)
+    width, height = letter
+
+    # Set title and profile name at the top
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, height - 40, f"Profile: {profile_name}")
+    c.setFont("Helvetica", 12)
+
+    # Add Next Steps
+    next_steps = profile_data.get('next_steps', {})
+    c.drawString(100, height - 80, "Next Steps:")
+    y_position = height - 100
+    for step, response in next_steps.items():
+        c.drawString(110, y_position, f"{step}: {response}")
+        y_position -= 20
+
+    # Add Contacts
+    c.drawString(100, y_position - 20, "Contacts:")
+    y_position -= 40
+    for contact in profile_data.get('contacts', []):
+        contact_info = f"Name: {contact['name']}, Phone: {contact['phone']}, Email: {contact['email']}, Address: {contact['address']}, Relation: {contact['relation']}"
+        c.drawString(110, y_position, contact_info)
+        y_position -= 20
+
+    # Add Vehicles
+    c.drawString(100, y_position - 20, "Vehicles:")
+    y_position -= 40
+    for vehicle in profile_data.get('vehicles', []):
+        make = vehicle.get('name', 'N/A')
+        model = vehicle.get('model', 'N/A')
+        color = vehicle.get('color', 'N/A')
+        year = vehicle.get('year', 'N/A')
+        vehicle_info = f"Make: {make}, Model: {model}, Color: {color}, Year: {year}"
+        c.drawString(110, y_position, vehicle_info)
+        y_position -= 20
+
+    # Save and close the PDF
+    c.showPage()
+    c.save()
+
+    messagebox.showinfo("PDF Generated", f"PDF for {profile_name} has been generated and saved to '{pdf_filename}'.")
+
+def open_biography_window(profile_name, update_status_callback):
+    biography_window = tk.Toplevel()
+    biography_window.title(f"Manage Biographies for {profile_name}")
+
+    # Create a listbox to display existing biographies
+    biography_listbox = tk.Listbox(biography_window)
+    biography_listbox.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+
+    # Retrieve the selected profile's data
+    profile_data = next((p for p in profiles if p['name'] == profile_name), None)
+
+    # Initialize biographies list if not present
+    if profile_data and 'biographies' not in profile_data:
+        profile_data['biographies'] = []
+
+    # Function to add a biography
+    def add_biography():
+        # Open a new window to enter biography details
+        biography_form = tk.Toplevel()
+        biography_form.title("Add Biography")
+
+        # Create fields for biography details
+        fields = {
+            "Name": tk.Entry(biography_form),
+            "Address": tk.Entry(biography_form),
+            "Phone Number": tk.Entry(biography_form),
+            "Residency": tk.Entry(biography_form),
+            "Military Service": tk.Entry(biography_form),
+            "Marriages": [],
+            "Divorces": [],
+            "Parents": [],
+            "Children": [],
+            "Siblings": [],
+            "Other": []
+        }
+
+        # Function to add entry fields dynamically for multi-entry fields
+        def add_entry_field(frame, field_name, value="", index=1):
+            entry_frame = tk.Frame(frame)
+            entry_frame.pack(fill=tk.X, pady=2)
+
+            tk.Label(entry_frame, text=f"{index} {field_name}:").pack(side=tk.LEFT)
+            entry_var = tk.StringVar(value=value)
+            entry = tk.Entry(entry_frame, textvariable=entry_var)
+            entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+            # This function allows adding new fields dynamically
+            def on_input_change(*args):
+                current_value = entry.get().strip()
+                if current_value and len(fields[field_name]) == index:
+                    add_entry_field(frame, field_name, index=index + 1)  # Create a new entry field
+
+            entry_var.trace("w", on_input_change)  # Trace changes in the entry
+
+            # Store the entry variable for access in saving
+            fields[field_name].append(entry_var)
+
+        # Create input fields for single-entry items
+        for label, entry in fields.items():
+            if isinstance(entry, list):  # For multi-entry fields
+                frame = tk.Frame(biography_form)
+                frame.pack(pady=5, fill=tk.X)
+                tk.Label(frame, text=label + ":").pack(anchor="w")
+                # Add initial entry field and allow one additional empty field for new entry
+                add_entry_field(frame, label)  
+            else:  # For single-entry fields
+                tk.Label(biography_form, text=label + ":").pack(pady=5)
+                entry.pack(pady=5)
+
+        # Save the biography and update the listbox
+        def save_biography():
+            # Collect data from single-entry fields
+            new_biography = {field: entry.get() for field, entry in fields.items() if not isinstance(entry, list)}
+            # Add the multiple-entry fields data
+            for field, entry_vars in fields.items():
+                if isinstance(entry_vars, list):
+                    new_biography[field] = [entry_var.get().strip() for entry_var in entry_vars if entry_var.get().strip()]
+
+            # Append the new biography to te profile's biographies
+            profile_data['biographies'].append(new_biography)
+
+            # Update the listbox to display the new biography
+            biography_listbox.insert(tk.END, new_biography["Name"])  # Display name in the listbox
+            biography_form.destroy()  # Close the form after saving
+
+        # Button to save the biography
+        tk.Button(biography_form, text="Save Biography", command=save_biography).pack(pady=10)
+
+    # Function to edit the selected biography
+    def edit_biography():
+        selected_index = biography_listbox.curselection()
+        if selected_index:
+            selected_biography = profile_data['biographies'][selected_index[0]]  # Retrieve the actual biography data
+
+            # Open the form to edit the biography details
+            biography_form = tk.Toplevel()
+            biography_form.title(f"Edit Biography: {selected_biography['Name']}")
+
+            # Create fields for biography details (same as add)
+            fields = {
+                "Name": tk.Entry(biography_form),
+                "Address": tk.Entry(biography_form),
+                "Phone Number": tk.Entry(biography_form),
+                "Residency": tk.Entry(biography_form),
+                "Military Service": tk.Entry(biography_form),
+                "Marriages": tk.Entry(biography_form),
+                "Divorces": tk.Entry(biography_form),
+                "Parents": tk.Entry(biography_form),
+                "Children": tk.Entry(biography_form),
+                "Siblings": tk.Entry(biography_form),
+                "Other": tk.Entry(biography_form)
+
+            }
+
+            # Populate the fields with the existing data
+            for label, entry in fields.items():
+                if isinstance(entry, list):
+                    frame = tk.Frame(biography_form)
+                    frame.pack(pady=5, fill=tk.X)
+                    tk.Label(frame, text=label + ":").pack(anchor="w")
+                    # Use existing values for multi-entry fields
+                    for i, value in enumerate(selected_biography.get(label, [])):
+                        add_entry_field(frame, label, value, index=i + 1)
+                    add_entry_field(frame, label)  # Allow one additional empty field for new entry
+                else:
+                    tk.Label(biography_form, text=label + ":").pack(pady=5)
+                    entry.insert(0, selected_biography.get(label, ""))  # Use the selected biography data
+
+                    entry.pack(pady=5)
+
+            # Save the edited biography and update the listbox
+            def save_edited_biography():
+                # Collect data from single-entry fields
+                edited_biography = {field: entry.get() for field, entry in fields.items() if not isinstance(entry, list)}
+                # Add the multiple-entry fields data
+                for field, entry_vars in fields.items():
+                    if isinstance(entry_vars, list):
+                        edited_biography[field] = [entry_var.get().strip() for entry_var in entry_vars if entry_var.get().strip()]
+
+                # Update the selected biography in the profile's biographies
+                profile_data['biographies'][selected_index[0]] = edited_biography
+
+                # Update the listbox
+                biography_listbox.delete(selected_index)
+                biography_listbox.insert(selected_index, edited_biography["Name"])  # Update name in the listbox
+                biography_form.destroy()  # Close the form after saving
+
+            # Button to save the edited biography
+            tk.Button(biography_form, text="Save Edited Biography", command=save_edited_biography).pack(pady=10)
+
+    # Add "Add Biography" button
+    add_button = tk.Button(biography_window, text="Add Biography", command=add_biography)
+    add_button.pack(pady=10)
+
+    # Add "Edit Biography" button
+    edit_button = tk.Button(biography_window, text="Edit Biography", command=edit_biography)
+    edit_button.pack(pady=10)
+
+    # Populate existing biographies if available
+    if profile_data:
+        for biography in profile_data['biographies']:
+            biography_listbox.insert(tk.END, biography["Name"])  # Display names in the listbox
+
+    # Button to close the biography window
+    tk.Button(biography_window, text="Close", command=biography_window.destroy).pack(pady=10)
+
+def open_profile_window(profile_name):
+    profile_window = tk.Toplevel()
+    profile_window.title(f"Profile: {profile_name}")
+    profile_window.state('zoomed')
+
+    tk.Label(profile_window, text=f"Manage {profile_name}'s Information", font=("Arial", 20)).grid(row=0, column=0, columnspan=2, pady=10)
+    profile_data = next((profile for profile in profiles if profile['name'] == profile_name), None)
+
+    if profile_data:
+        # Manage Next Steps button
+        tk.Button(profile_window, text="Manage Next Steps", command=lambda: open_next_steps_window(profile_name)).grid(row=1, column=0, pady=5, padx=10)
+
+        # Function to update the status labels
+        def update_status_callback():
+            contact_status = "Complete" if profile_data.get('contacts', []) else "Incomplete"
+            contact_status_label.config(text=contact_status)
+            vehicle_status = "Complete" if profile_data.get('vehicles', []) else "Incomplete"
+            vehicle_status_label.config(text=vehicle_status)
+
+        # Contacts section
+        contact_status = "Complete" if profile_data.get('contacts', []) else "Incomplete"
+        tk.Button(profile_window, text="Manage Contacts", command=lambda: open_contacts_window(profile_name, update_status_callback)).grid(row=2, column=0, pady=5, padx=10)
+        contact_status_label = tk.Label(profile_window, text=contact_status)
+        contact_status_label.grid(row=2, column=1)
+
+        # Vehicles section
+        vehicle_status = "Complete" if profile_data.get('vehicles', []) else "Incomplete"
+        tk.Button(profile_window, text="Manage Vehicles", command=lambda: open_vehicles_window(profile_name, update_status_callback)).grid(row=3, column=0, pady=5, padx=10)
+        vehicle_status_label = tk.Label(profile_window, text=vehicle_status)
+        vehicle_status_label.grid(row=3, column=1)
+        tk.Button(profile_window, text="Create Biography", command=lambda: open_biographies_window(profile_name, update_status_callback)).grid(row=4, column=0, pady=5, padx=10)
+        tk.Button(profile_window, text="Generate PDF", command=lambda: generate_profile_pdf(profile_name)).grid(row=5, column=0, pady=5, padx=10)
+
+    # Exit button to close the profile window
+    tk.Button(profile_window, text="Exit", command=profile_window.destroy).grid(row=7, column=0, pady=5, padx=10)
+
+# Function to handle double-click on a profile in the listbox
+def on_profile_double_click(event):
+    selected_index = profiles_listbox.curselection()
+    if selected_index:
+        selected_profile_name = profiles_listbox.get(selected_index[0])
+        open_profile_window(selected_profile_name)
+
+# Main window setup
+root = tk.Tk()
+root.title("Profiles Management")
+
+tk.Label(root, text="Profiles", font=("Arial", 30)).pack(pady=10)
+
+profiles_listbox = tk.Listbox(root, height=10, width=50)
+profiles_listbox.pack(pady=10)
+for profile in profiles:
+    profiles_listbox.insert(tk.END, profile['name'])
+
+profiles_listbox.bind("<Double-Button-1>", on_profile_double_click)
+
+# Add new profile button
+def add_new_profile():
+    new_profile_name = new_profile_entry.get().strip()
+    if new_profile_name:
+        if any(p['name'] == new_profile_name for p in profiles):
+            messagebox.showwarning("Duplicate Profile", "A profile with this name already exists.")
+        else:
+            profiles.append({'name': new_profile_name})
+            save_profiles(profiles)
+            profiles_listbox.insert(tk.END, new_profile_name)
+            new_profile_entry.delete(0, tk.END)
+            messagebox.showinfo("Profile Added", f"Profile '{new_profile_name}' has been added.")
+    else:
+        messagebox.showwarning("Input Error", "Please enter a profile name.")
+
+# Entry and button to add new profiles
+new_profile_entry = tk.Entry(root)
+new_profile_entry.pack(pady=5)
+tk.Button(root, text="Add New Profile", command=add_new_profile).pack(pady=5)
+
+# Start the main loop
+root.mainloop()
